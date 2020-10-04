@@ -6,3 +6,6 @@ __pycache__/
 # Data Sourse Files
 datasets/data/
 
+
+# other materials
+materials/
