@@ -10,3 +10,7 @@ datasets/data/
 # other materials
 materials/
 case_test/
+
+
+# bash Files
+*.bash

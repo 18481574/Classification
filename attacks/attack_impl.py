@@ -8,9 +8,12 @@ import torch.optim as optim
 
 from typing import Optional
 
+# attacker from other files
+from pixelAttack import pixelAttacker
+
 __all__ = ['PGD', 'FGSM', 'IFGSM', 'OnePixelAttack', ]
 
-
+# Random start was not implemented currently
 
 # Modification of the code from https://github.com/Hadisalman/smoothing-adversarial/blob/master/code/attacks.py
 class PGD(object):
@@ -41,7 +44,7 @@ class PGD(object):
 
     def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
             targeted: bool = False) -> torch.Tensor:
-        return self._attack(model, inputs, labels, noise, targeted)
+        return self._attack(model, inputs, labels, targeted)
 
 
     def _attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
@@ -68,6 +71,7 @@ class PGD(object):
         batch_size = inputs.shape[0]
         multiplier = 1 if targeted else -1
         delta = torch.zeros_like(inputs, requires_grad=True)
+
 
         # Setup optimizers
         optimizer = optim.SGD([delta], lr=self.max_norm/self.steps*2)
@@ -128,7 +132,7 @@ class FGSM(object):
 
     def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
             targeted: bool = False) -> torch.Tensor:
-        return self._attack(model, inputs, labels, noise, targeted)
+        return self._attack(model, inputs, labels, targeted)
 
 
     def _attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
@@ -191,7 +195,7 @@ class FGSM(object):
 
 class IFGSM(object):
     """
-    FGSM attack
+    IFGSM attack
     Parameters
     ----------
     steps : int
@@ -219,11 +223,11 @@ class IFGSM(object):
 
     def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
             targeted: bool = False) -> torch.Tensor:
-        return self._attack(model, inputs, labels, noise, targeted)
+        return self._attack(model, inputs, labels, targeted)
 
 
     def _attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
-               noise: torch.Tensor = None, targeted: bool = False) -> torch.Tensor:
+             targeted: bool = False) -> torch.Tensor:
         """
         Performs the attack of the model for the inputs and labels.
         Parameters
@@ -285,61 +289,6 @@ class IFGSM(object):
         self.device = device 
 
 
+def OnePixelAttack(**_info): 
+    return PixelAttacker(_info)
 
-class OnePixelAttack(object):
-    """
-    FGSM attack
-    Parameters
-    ----------
-    steps : int
-        Number of steps for the optimization.
-    max_norm : float or None, optional
-        If specified, the norms of the perturbations will not be greater than this value which might lower success rate.
-    device : torch.device, optional
-        Device on which to perform the attack.
-    """
-    def __init__(self,
-                 steps: int = 10,
-                 random_start: bool = True,
-                 max_norm: Optional[float] = None,
-                 device: torch.device = torch.device('cpu')) -> None:
-        super(OnePixelAttack, self).__init__()
-
-        self.steps = steps
-        self.eps_iter = step_size
-        self.random_start = random_start
-        self.max_norm = max_norm
-        self.device = device
-
-
-    def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
-            targeted: bool = False) -> torch.Tensor:
-        return self._attack(model, inputs, labels, noise, targeted)
-
-
-    def _attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
-               noise: torch.Tensor = None, targeted: bool = False) -> torch.Tensor:
-        """
-        Performs the attack of the model for the inputs and labels.
-        Parameters
-        ----------
-        model : nn.Module
-            Model to attack.
-        inputs : torch.Tensor
-            Batch of samples to attack. Values should be in the [0, 1] range.
-        labels : torch.Tensor
-            Labels of the samples to attack if untargeted, else labels of targets.
-        targeted : bool, optional
-            Whether to perform a targeted attack or not.
-        Returns
-        -------
-        torch.Tensor
-            Batch of samples modified to be adversarial to the model.
-        """
-        if inputs.min() < 0 or inputs.max() > 1: raise ValueError('Input values should be in the [0, 1] range.')
-        
-    
-
-
-    def set_device(device: torch.device):
-        self.device = device 

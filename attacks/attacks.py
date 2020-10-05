@@ -68,7 +68,7 @@ _INFO_COMMON = ['steps', 'random_start', ]
 _INFO_PGD = ['max_norm', 'step_size', ] # L2-Normalization
 _INFO_FGSM = ['step_size', ]
 _INFO_IFGSM = ['step_size', 'max_norm', ]
-_INFO_ONEPIXEL = []
+_INFO_ONEPIXEL = ['popsize']
 
 def _extract_info(**kwargs, *_info_List):
     _info = {}
