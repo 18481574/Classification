@@ -16,17 +16,17 @@ _ATTACK_LIST = {
 
 class Attack(object):
 
-    def __init__(self, name='LPG', **kwargs):
-        super(self).__init__() kw
+    def __init__(self, name='LPG', device=torch.device('cpu'), **kwargs):
+        super(Attack, self).__init__() 
         if name not in _ATTACK_LIST:
             raise ValueError('The specified attack is not supported yet.')
 
         self.name = name
-
+        self.device = device
         # self._init(kwargs) # extract some properties of attack
 
         self.attack_ = _ATTACK_LIST[name](kwargs)
-
+        self.set_device(self.device)
 
     # def _init(self, **kwargs):
 
@@ -40,20 +40,65 @@ class Attack(object):
     def set(self, **kwargs):
         self.attack_.set(kwargs)
 
+    def set_device(device=torch.device('cpu')):
+        self.attack_.set_device(device)
 
 
 
 def _PGD(**kwargs):
-    return PGD(kwargs)
+    _info = _extract_PGD(kwargs)
+    return PGD(**_info)
 
 def _FGSM(**kwargs):
-    return FGSM(kwargs)
+    _info = _extract_FGSM(kwargs)
+    return FGSM(**_info)
 
 def _IFGSM(**kwargs):
-    return IFGSM(kwargs)
+    _info = _extract_IFGSM(kwargs)
+    return IFGSM(**info)
 
 def _One_pixel(**kwargs):
-    return one_pixel_attack(kwargs)
+    _extract_One_pixel(**kwargs)
+    return OnePixelAttack(**_info)
+
+
+
+
+_INFO_COMMON = ['steps', 'random_start', ]
+_INFO_PGD = ['max_norm', 'step_size', ] # L2-Normalization
+_INFO_FGSM = ['step_size', ]
+_INFO_IFGSM = ['step_size', 'max_norm', ]
+_INFO_ONEPIXEL = []
+
+def _extract_info(**kwargs, *_info_List):
+    _info = {}
+    
+    for v in _info_List:
+        if v in kwargs:
+            _info[v] = kwargs[v]
+
+    return _info
+
+def _extract_PGD(**kwagrs):
+    _info_List = [*_INFO_COMMON, *INFO_PGD]
+    return _extract_info(kwargs, _info_List)
+
+def _extract_PGD(**kwagrs):
+    _info_List = [*_INFO_COMMON, *INFO_PGD]
+    return _extract_info(kwargs, _info_List)
+
+def _extract_FGSM(**kwagrs):
+    _info_List = [*_INFO_COMMON, *_INFO_FGSM]
+    return _extract_info(kwargs, _info_List)
+
+def _extract_IFGSM(**kwagrs):
+    _info_List = [*_INFO_COMMON, *_INFO_IFGSM]
+    return _extract_info(kwargs, _info_List)
+
+def _extract_One_pixel(**kwagrs):
+    _info_List = [*_INFO_COMMON, *_INFO_ONEPIXEL]
+    return _extract_info(kwargs, _info_List)
+
 
 
 
