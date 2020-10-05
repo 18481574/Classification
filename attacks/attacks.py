@@ -7,7 +7,7 @@ from attack_impl import *
 __all__ == ['Attack', ]
 
 _ATTACK_LIST = {
-    'LPG': _LPG,
+    'PGD': _PGD,
     'FGSM': _FGSM,
     'IFGSM': _IFGSM,
     'one_pixel':_One_pixel,
@@ -43,8 +43,8 @@ class Attack(object):
 
 
 
-def _LPG(**kwargs):
-    return LPG(kwargs)
+def _PGD(**kwargs):
+    return PGD(kwargs)
 
 def _FGSM(**kwargs):
     return FGSM(kwargs)
