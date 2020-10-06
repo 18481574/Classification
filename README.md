@@ -18,9 +18,9 @@
 
 * MNIST
 * CIFAR10
-* [ ] Generator
+* [x] Generator
 
-- [ ] Loader
+- [x] Loader
 
 
 

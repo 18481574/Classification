@@ -78,7 +78,7 @@ class PixelAttacker(object):
         imgs_perturbed = perturb_image(xs, imgs)
         mask = _get_mask(labels, targeted)
         predictions = model(imgs_perturbed)
-        # This function should always be minimized, so return its complement if needed
+        # This function should always be minimized, so return its complement if neede
         return predictions if minimize else 1 - predictions
 
     def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
