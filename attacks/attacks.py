@@ -1,10 +1,27 @@
 import torch 
 import numpy as np 
 
-from attack_impl import *
+from .attack_impl import *
 
 
-__all__ == ['Attack', ]
+__all__ = ['Attack', ]
+
+
+def _PGD(**kwargs):
+    _info = _extract_PGD(kwargs)
+    return PGD(**_info)
+
+def _FGSM(**kwargs):
+    _info = _extract_FGSM(kwargs)
+    return FGSM(**_info)
+
+def _IFGSM(**kwargs):
+    _info = _extract_IFGSM(kwargs)
+    return IFGSM(**info)
+
+def _One_pixel(**kwargs):
+    _extract_One_pixel(**kwargs)
+    return OnePixelAttack(**_info)
 
 _ATTACK_LIST = {
     'PGD': _PGD,
@@ -45,23 +62,6 @@ class Attack(object):
 
 
 
-def _PGD(**kwargs):
-    _info = _extract_PGD(kwargs)
-    return PGD(**_info)
-
-def _FGSM(**kwargs):
-    _info = _extract_FGSM(kwargs)
-    return FGSM(**_info)
-
-def _IFGSM(**kwargs):
-    _info = _extract_IFGSM(kwargs)
-    return IFGSM(**info)
-
-def _One_pixel(**kwargs):
-    _extract_One_pixel(**kwargs)
-    return OnePixelAttack(**_info)
-
-
 
 
 _INFO_COMMON = ['steps', 'random_start', ]
@@ -70,7 +70,7 @@ _INFO_FGSM = ['step_size', ]
 _INFO_IFGSM = ['step_size', 'max_norm', ]
 _INFO_ONEPIXEL = ['popsize']
 
-def _extract_info(**kwargs, *_info_List):
+def _extract_info(_info_List, **kwargs):
     _info = {}
     
     for v in _info_List:
@@ -81,23 +81,23 @@ def _extract_info(**kwargs, *_info_List):
 
 def _extract_PGD(**kwagrs):
     _info_List = [*_INFO_COMMON, *INFO_PGD]
-    return _extract_info(kwargs, _info_List)
+    return _extract_info(_info_List, kwargs)
 
 def _extract_PGD(**kwagrs):
     _info_List = [*_INFO_COMMON, *INFO_PGD]
-    return _extract_info(kwargs, _info_List)
+    return _extract_info(_info_List, kwargs)
 
 def _extract_FGSM(**kwagrs):
     _info_List = [*_INFO_COMMON, *_INFO_FGSM]
-    return _extract_info(kwargs, _info_List)
+    return _extract_info(_info_List, kwargs)
 
 def _extract_IFGSM(**kwagrs):
     _info_List = [*_INFO_COMMON, *_INFO_IFGSM]
-    return _extract_info(kwargs, _info_List)
+    return _extract_info(_info_List, kwargs)
 
 def _extract_One_pixel(**kwagrs):
     _info_List = [*_INFO_COMMON, *_INFO_ONEPIXEL]
-    return _extract_info(kwargs, _info_List)
+    return _extract_info(_info_List, kwargs)
 
 
 

@@ -7,15 +7,16 @@ import pandas as pd
 import pickle
 
 import torch
+import torch.nn as nn
 
 # Helper functions
-from differential_evolution import *
+from .differential_evolution import *
 
 __all__ = ['PixelAttacker']
 
 # Not complete
 
-def perturb_image(xs:numpy.array , img: torch.Tensor)-> torch.Tensor:
+def perturb_image(xs:np.array , img: torch.Tensor)-> torch.Tensor:
     """
         Get the perturbed imgs with the given pertubation
         Parameters

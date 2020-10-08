@@ -9,7 +9,7 @@ import torch.optim as optim
 from typing import Optional
 
 # attacker from other files
-from pixelAttack import pixelAttacker
+from .pixelAttack import PixelAttacker
 
 __all__ = ['PGD', 'FGSM', 'IFGSM', 'OnePixelAttack', ]
 
@@ -291,4 +291,5 @@ class IFGSM(object):
 
 def OnePixelAttack(**_info): 
     return PixelAttacker(_info)
+    return []
 

@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 import torchvision.datasets as datasets
+import torchvision.transforms as transforms
 
 import collections
 
@@ -14,6 +15,7 @@ __all__ = ['DataSet', 'print_path']
 def print_path():
     path = os.getcwd()
     print(path)
+
 
 
 # dateset descriptor
@@ -35,7 +37,7 @@ _MNIST_INFORMATION = DatasetDescriptor(
     splits_to_sizes = { 'train': 60000,
                         'train_aug': 100000, # randomly choose?
                         'test': 10000,
-                        'train_small': 5000,},
+                        'train_small': 600,},
     num_classes = 10,
     unknown_label = None,
 
@@ -59,14 +61,50 @@ _DATASETS_INFORMATION = {
 }
 
 
+transform = transforms.ToTensor()
+
+
 class DataSet(Dataset):
-    def __init__(self, dataset='mnist', split='train', files_dir=None):
+    '''The class of dataset for networks training ans testing.
+    -----------------------------------
+    Parameters:
+    dataset_name: str
+        The name of the dataset
+    split: str
+        The type of the dataset, e.g. 'train', 'val', 'test'...
+    train: bool
+        The data for train or not
+    aug: bool
+        Augmented data or not
+    small: bool
+        True: only use a part samples of data to train or test
+        False: use all the data
+        data_small = data[small_idx]
+    samples_small: list
+        A list contain the index of the samples of small dataset
+    data_aug / target_aug: torch.Tensor
+        The data of augmented data. --------- add later
+    N: int
+        The number of sample in the dataset
+    num_classes: int
+        Number of the classes in the dataset
+    unknown_label: int or None
+        Unlabeled data or the data cannot be recognized 
+    data, target: torch.Tensor
+        The data of the input and the target
+    data_src / target_src: torch.Tensor
+        The source data of the data and target
+    classes: dictionary
+        The names of each classes in the dataset
+    '''
+    def __init__(self, dataset='mnist', split='train', files_dir=None, transform=transform):
         super(DataSet, self).__init__()
         if dataset not in _DATASETS_INFORMATION:
             raise ValueError('The specified dataset is not supported yet.')
 
         self.dataset_name = dataset
         self.split = split 
+        self.transform = transform
         
         self.train = _is_train(split)
         self.aug = _is_aug(split)
@@ -77,19 +115,38 @@ class DataSet(Dataset):
         if files_dir is None:
             files_dir = _DATASETS_INFORMATION[dataset].save_dir
 
-        self.data, self.targets, self.calsses = self._load(files_dir, dataset, split) 
+        self.data_src, self.targets_src, self.classes = self._load(files_dir) 
 
         if self.aug:
-            self.N = len(self.data) 
+            self.data_aug = self._aug()
+            self.N = len(self.data_aug) 
         else:
             self.N = _DATASETS_INFORMATION[dataset].splits_to_sizes
+            if _is_small(split):
+                skip = len(self.data.src) / self.N
+                self.small_idx = list(range(0, len(sel.data_src), skip))
+                
+    @property
+    def data(self):
+        if self.aug:
+            return self.data_aug
+        elif self.small:
+            return self.data_src[self.small_idx]
+        return self.data_src
 
+    @property
+    def target(self):
+        if self.aug:
+            return traget_aug
+        elif self.small:
+            return self.target_src[self.small_idx]
+        return self.data_src
 
-    def _load(self, files_dir, dataset, split): 
-        if dataset == 'mnist':
-            return _mnist_load(files_dir, dataset, split, self.aug)
-        elif dataset == 'cifar10':
-            return _cifar10_load(files_dir, dataset, split, self.aug)
+    def _load(self, files_dir): 
+        if self.dataset_name == 'mnist':
+            return _mnist_load(files_dir, self.train, self.transform)
+        elif self.dataset_name == 'cifar10':
+            return _cifar10_load(files_dir, self.train, self.transform)
         else:
             return _dataset_load(files_dir, dataset, split)
 
@@ -120,6 +177,8 @@ def _is_train(split):
 def _is_aug(split):
     return split.find('aug') > -1 
 
+def _is_small(split):
+    return split.find('small') > -1
 
 # not complete
 def _aug(data, target):
@@ -127,35 +186,31 @@ def _aug(data, target):
     return data, target
 
 
-def _mnist_load(files_dir, dataset, split, aug=False):
+def _mnist_load(files_dir, train, transform):
     if not os.path.exists(files_dir):
         os.mkdir(files_dir)
 
     classes = {0:'zero', 1:'one', 2:'two', 3:'three', 4:'four',
                 5:'five', 6:'six', 7:'seven', 8:'eight', 9:'nine'}
 
-    train = _is_train(split)
+    # train = _is_train(split)
 
-    data_set = datasets.MNIST(files_dir, train=train, download=True)
+    data_set = datasets.MNIST(files_dir, train=train, download=True, transform=transform)
 
     data, targets = data_set.data, data_set.targets
-
-    if aug:
-        data, targets = _aug(data, targets)
 
 
     return data, targets, classes
 
 
-def _cifar10_load(files_dir, dataset, split, aug=False):
+def _cifar10_load(files_dir, train, transform):
     files_dir = os.path.join(files_dir, 'CIFAR10')
 
     if not os.path.exists(files_dir):
         os.mkdir(files_dir)
 
-    train = _is_train(split)
 
-    data_set = datasets.CIFAR10(files_dir, train=train, download=True)
+    data_set = datasets.CIFAR10(files_dir, train=train, download=True, transform=transform)
 
     data, targets = data_set.data, data_set.targets
 
@@ -163,8 +218,6 @@ def _cifar10_load(files_dir, dataset, split, aug=False):
     N = len(classes)
     classes = {i: classes[i] for i in range(N)}
 
-    if aug:
-        data, targets = _aug(data, targets)
 
     return data, targets, classes
 
