@@ -40,12 +40,9 @@ class Attack(object):
 
         self.name = name
         self.device = device
-        # self._init(kwargs) # extract some properties of attack
 
         self.attack_ = _ATTACK_LIST[name](kwargs)
         self.set_device(self.device)
-
-    # def _init(self, **kwargs):
 
 
     # default: attack without target label 
