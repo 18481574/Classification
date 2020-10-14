@@ -17,12 +17,18 @@ __all__ = ['GraphTV', ]
 #   loss_TV.backward()...
 # 
 class GraphTV(nn.Module):
-    def __init__(self, n=100, alpha=1.):
+    def __init__(self, n=100, alpha=1., n_Neigbr=15, n_sig=8):
         super(GraphTV, self).__init__()
         self.n = n
+        
+        self.n_Neigbr = min(n, n_Neigbr)
+        self.n_sig = min(n_Neigbr, n_sig)
+
         self.alpha = alpha 
 
-    def forward(self, x, W):
+    def forward(self, x):
+
+        W = self._get_W(x, self.n_Neigbr, self.n_sig)
 
     	Wx = W.matmul(x)
     	norm_ = Wx.norm(dim=1)

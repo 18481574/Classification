@@ -157,13 +157,13 @@ class CNN_MNIST_DO(nn.Module):
         y = self.softmax(y)
         return y
 
-class CNN_MNIST(nn.Module):
-    def __init__(self, in_channels=1, num_class=10, input_size=28, dropout_rate=0., device='cpu'):
-        super(CNN_MNIST, self).__init__()
+class CNN_MNIST_Grad(nn.Module):
+    def __init__(self, in_channels=1, num_class=10, input_size=28, dropout_rate=0., alpha = .05, device='cpu'):
+        super(CNN_MNIST_Grad, self).__init__()
         self.in_channels = in_channels
         self.num_class = num_class
         self.input_size = input_size
-        self.train = True
+        self.training = True
         self.prob = dropout_rate
         self.device = device
         self.num_channels=[16, 64]
@@ -181,24 +181,26 @@ class CNN_MNIST(nn.Module):
         self.softmax = SoftMax()
         self.grad = {}
 
+        self.alpha = alpha
+
     def forward(self, x):
         y = self.conv1(x)
         y = self.pool1(y)
         y = self.activation1(y)
         if self.prob>0:
-            y = self.dropout1(y, self.train)
+            y = self.dropout1(y, self.training)
         y = self.conv2(y)
         y = self.pool2(y)
         y = self.activation2(y)
         if self.prob>0:
-            y = self.dropout2(y, self.train)
+            y = self.dropout2(y, self.training)
         y = self.fc1(y.view(-1, int(self.input_size/4)**2*self.num_channels[1]))
         y = self.activation3(y)
         y = self.fc2(y)
         y = self.softmax(y)
         return y
 
-    def Gradient(self):
+    def GradientLoss(self):
         for i in range(self.num_class):
             grad = self.softmax.Gradient(i)
             # grad = torch.mm(g.view(-1,self.num_class), self.fc1.weight)
@@ -216,8 +218,17 @@ class CNN_MNIST(nn.Module):
             grad = self.activation1.Gradient(grad)
             grad = self.pool1.Gradient(grad)
             grad = self.conv1.Gradient(grad)
-            self.grad[i] = grad
-        return self.grad
+            # self.grad[i] = grad
+
+            Loss = torch.norm(grad) # default is 'frob'
+
+            if i>0: 
+                Loss_sum = Loss_sum + Loss
+            else:
+                Loss_sum = Loss
+            
+        # return self.grad
+        return Loss_sum * self.alpha
 
         # for j in range(1):
         #     i = np.random.randint(10)
@@ -237,6 +248,45 @@ class CNN_MNIST(nn.Module):
         # return self.grad
 
 
+class CNN_MNIST(nn.Module):
+    def __init__(self, in_channels=1, num_class=10, input_size=28, dropout_rate=0., device='cpu'):
+        super(CNN_MNIST, self).__init__()
+        self.in_channels = in_channels
+        self.num_class = num_class
+        self.input_size = input_size
+        self.training = True
+        self.prob = dropout_rate
+        self.device = device
+        self.num_channels=[16, 64]
+        self.conv1 = ConvGrad(in_channels=self.in_channels, out_channels=self.num_channels[0], kernel_size=3, input_size=self.input_size)
+        self.activation1 = SigmoidGrad()
+        self.dropout1 = DropoutGrad(self.prob, device=device)
+        self.pool1 = MaxPoolGrad()
+        self.conv2 = ConvGrad(in_channels=self.num_channels[0], out_channels=self.num_channels[1], kernel_size=3, input_size=self.input_size)
+        self.activation2 = SigmoidGrad()
+        self.dropout2 = DropoutGrad(self.prob, device=device)
+        self.pool2 = MaxPoolGrad()
+        self.fc1 = LinearGrad(self.num_channels[1]*int(input_size/4)**2, 1000)
+        self.activation3 = SigmoidGrad()
+        self.fc2 = LinearGrad(1000, self.num_class)
+        self.softmax = SoftMax()
+
+    def forward(self, x):
+        y = self.conv1(x)
+        y = self.pool1(y)
+        y = self.activation1(y)
+        if self.prob>0:
+            y = self.dropout1(y, self.training)
+        y = self.conv2(y)
+        y = self.pool2(y)
+        y = self.activation2(y)
+        if self.prob>0:
+            y = self.dropout2(y, self.training)
+        y = self.fc1(y.view(-1, int(self.input_size/4)**2*self.num_channels[1]))
+        y = self.activation3(y)
+        y = self.fc2(y)
+        y = self.softmax(y)
+        return y
 
 def main():
     batch_size = 2
