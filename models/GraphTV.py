@@ -23,22 +23,20 @@ class GraphTV(nn.Module):
         
         self.n_Neigbr = min(n, n_Neigbr)
         self.n_sig = min(n_Neigbr, n_sig)
-
+        self.W = None
         self.alpha = alpha 
 
     def forward(self, x):
+        # W = self._get_W(x, self.n_Neigbr, self.n_sig)
+        Wx = self.W.matmul(x)
+        norm_ = Wx.norm(dim=1)
 
-        W = self._get_W(x, self.n_Neigbr, self.n_sig)
-
-    	Wx = W.matmul(x)
-    	norm_ = Wx.norm(dim=1)
-
-    	return self.alpha *  torch.sum(norm_)
+        return self.alpha *  torch.mean(norm_)
 
 
     def _upd(self, n = 100, alpha=1.0):
         self.n = n
-        self.alpha = alpha
+        # self.alpha = alpha
 
     @staticmethod
     def _get_W(x:torch.Tensor, n_Neigbr=15, n_sig=8):
@@ -50,7 +48,7 @@ class GraphTV(nn.Module):
         n_sig = min(n_sig, n_Neigbr)
 
         # Calculate the distance
-        X = x.numpy()
+        X = x.detach().numpy()
         nbrs = NearestNeighbors(n_neighbors=n_Neigbr, algorithm='ball_tree').fit(X)
 
         dis, idx = nbrs.kneighbors(X)
@@ -61,6 +59,6 @@ class GraphTV(nn.Module):
         idx_j = torch.cat( (torch.LongTensor(idx[:, 0].repeat(n_Neigbr-1)), torch.LongTensor(idx[:,1:].repeat(1)), ) )
         
         v = torch.cat( (torch.FloatTensor(dis2[:, 1:] ).view( -1), - torch.FloatTensor(dis2[:, 1:]).view(-1), ) )
-        print(idx_i.shape, idx_j.shape, v.shape)
+        # print(idx_i.shape, idx_j.shape, v.shape)
         
         return sparse.FloatTensor(torch.cat( (idx_i.view(1, -1), idx_j.view(1, -1)) ), v, torch.Size([M, N]))

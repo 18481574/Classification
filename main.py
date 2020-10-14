@@ -35,14 +35,25 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
         output = model(input)
 
         if last_layer is not None:
-            processed = last_layer(output)
-            Loss = criterion(processed, target)
+            if 'GraphTV' in last_layer.__class__.__name__:
+                processed = torch.log(output)
+
+                last_layer.W = last_layer._get_W(input.view(input.shape[0], -1), last_layer.n_Neigbr, last_layer.n_sig)
+                Loss_Reg = last_layer(output)
+
+                Loss = criterion(processed, target) + Loss_Reg
+                print(Loss.item(), Loss_Reg.item())
+            else: # GradTV
+                processed = last_layer(output)
+                if 'GradientLoss' in dir(model):
+                    Loss_Reg = model.GradientLoss()
+                    Loss = criterion(processed, target) + Loss_Reg
+                else:
+                    Loss = criterion(processed, target)
+                # print(Loss.item(), Loss_Reg.item())
         else:
             Loss = criterion(output, target)
 
-        if 'GradientLoss' in dir(model):
-            Loss_Reg = model.GradientLoss()
-            Loss += Loss_Reg
 
         optimizer.zero_grad()
         Loss.backward()
@@ -77,8 +88,12 @@ def test(model: nn.Module, test_loader: DataLoader, criterion, last_layer=None, 
             output = model(input)
 
             if last_layer is not None:
-                processed = last_layer(output)
-                Loss = criterion(processed, target)
+                if 'GraphTV' in last_layer.__class__.__name__:
+                    processed = torch.log(output)
+                    Loss = criterion(processed, target) 
+                else: # GradTV
+                    processed = last_layer(output)
+                    Loss = criterion(processed, target)
             else:
                 Loss = criterion(output, target)
 
@@ -135,13 +150,13 @@ def main():
     leNet = leNet5()
     cnn = CNN()
     cnnGrad = CNNGrad() 
-    GraphTV = GraphTV(alpha=.05)
+    graphTV = CNN()
 
     Models = {
-        'leNet5': leNet,
-        'CNN_MNIST': cnn, 
-        'CNNGRAD_MNIST': cnnGrad,
-        'GraphTV': GraphTV,
+        # 'leNet5': leNet,
+        # 'CNN_MNIST': cnn, 
+        # 'CNNGRAD_MNIST': cnnGrad,
+        'GraphTV': graphTV,
     }
     
     results = []
@@ -153,8 +168,12 @@ def main():
             last_layer = torch.log
             criterion = nn.NLLLoss() 
         else:
-            last_layer = None
-            criterion = nn.CrossEntropyLoss()
+            if 'GraphTV' in name:
+                last_layer = GraphTV(alpha=.05)
+                criterion = nn.NLLLoss() 
+            else:
+                last_layer = None
+                criterion = nn.CrossEntropyLoss()
 
         # optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
