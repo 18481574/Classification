@@ -9,7 +9,7 @@ from .GraphTV import *
 CNNGrad = CNN_MNIST_Grad
 CNN = CNN_MNIST
 
-__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTV',]
+__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTV', 'FCNN', 'SoftMaxTV']
 
 
 
@@ -46,5 +46,48 @@ class leNet5(nn.Module):
         x = x.view(-1, 120)
         x = F.relu(self.fc1(x)) # 120 -> 84
         logit = self.fc2(x) # 84 -> 10
+
+        return logit
+
+
+class FCNN(nn.Module):
+    def __init__(self, in_channels=1, out_channels=10, input_size=28, dropout_rate=0., alpha = .05):
+        super(FCNN, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.drop_rate = dropout_rate
+        self.channels = [self.in_channels, 16, 64]
+        self.n_feature = 1000
+
+        self.feature = None # ...
+
+        self.activation = nn.Sigmoid()
+        self.dropout = nn.Dropout2d(p=self.drop_rate)
+
+        self.convs = []
+        self.maxPools = []
+        for i in range(len(self.channels)-1):
+            self.convs.append(nn.Conv2d(self.channels[i], self.channels[i+1], kernel_size=3, padding=1))
+            self.maxPools.append(nn.MaxPool2d(kernel_size=2, stride=2))
+            
+            # add to parameters
+            self.add_module('conv_' + str(i+1), self.convs[i])
+            self.add_module('maxPool_' + str(i+1), self.maxPools[i])
+
+
+        CHW = self.channels[-1] * (input_size // (2**len(self.convs)))**2
+        self.fc1 = nn.Linear(CHW, self.n_feature)
+        self.fc2 = nn.Linear(self.n_feature, self.out_channels)
+
+    def forward(self, x):
+        for i in range(len(self.convs)):
+            x = self.convs[i](x)
+            x = self.maxPools[i](x)
+            x = self.activation(x)
+            x = self.dropout(x)
+
+        self.feature = x
+        x = self.fc1(x.view(x.shape[0], -1))
+        logit = self.fc2(x)
 
         return logit
