@@ -9,7 +9,7 @@ from .GraphTV import *
 CNNGrad = CNN_MNIST_Grad
 CNN = CNN_MNIST
 
-__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTV', 'FCNN', 'SoftMaxTV']
+__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTV', 'FCNN', 'SoftMaxTV', 'TripletNet', ]
 
 
 
@@ -90,4 +90,8 @@ class FCNN(nn.Module):
         x = self.fc1(x.view(x.shape[0], -1))
         logit = self.fc2(x)
 
-        return logit
+        return self.feature, logit
+
+
+
+

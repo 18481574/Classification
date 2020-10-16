@@ -52,7 +52,7 @@ class GraphTV(nn.Module):
         nbrs = NearestNeighbors(n_neighbors=n_Neigbr, algorithm='ball_tree').fit(X)
 
         dis, idx = nbrs.kneighbors(X)
-        dis2 = np.exp(- dis**2 / dis[:, n_sig:n_sig+1] / 2 )
+        dis2 = np.exp(- dis**2 / dis[:, n_sig-1:n_sig] / 2 )
 
         if target is None:
             M = (n_Neigbr - 1) * N
@@ -101,7 +101,7 @@ class SoftMaxTV(nn.Module):
         eta = torch.zeros_like(grad)
 
         for i in range(self.iter):
-            eta = nn.functional.normalize(eta - self.tau * grad)
+            eta = nn.functional.normalize(eta + self.tau * grad)
             x =  x - self.alpha * self.W.transpose(0, 1).matmul(grad)
             grad = self.W.matmul(self.softmax(x))
 

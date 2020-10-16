@@ -98,7 +98,8 @@ def test(model: nn.Module, test_loader: DataLoader, criterion, last_layer=None, 
             output = model(input)
 
             if 'SoftMaxTV' in last_layer.__class__.__name__:
-                last_layer.W = GraphTV._get_W(model.feature.view(input.shape[0], -1), n_Neigbr=15, n_sig=8, target=target).to(device)
+                N_ = input.shape[0]//10
+                last_layer.W = GraphTV._get_W(model.feature.view(input.shape[0], -1), n_Neigbr=N_, n_sig=7).to(device)
                 output = last_layer(output)
 
             if last_layer is not None:
@@ -132,7 +133,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--batch-size-test', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=300, metavar='N',
+    parser.add_argument('--epochs', type=int, default=500, metavar='N',
                         help='number of epochs to train (default: 100)')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate (default: 0.01)')
@@ -181,6 +182,13 @@ def main():
         'CNN_Feature': cnnFeature,
     }
     
+    Information_List = {
+        'leNet5': _Info_leNet5,
+        'cnnGrad': _Info_cnnGrad,
+        'GraphTV': _Info_graphTV,
+        'CNN_Feature': _Info_Feature,
+    }
+
     results = []
 
     verbose = False
@@ -214,8 +222,10 @@ def main():
         for epoch in range(args.epochs):
             loss_train, acc_train = train(model, train_loader, criterion, optimizer, epoch=epoch, last_layer=last_layer, device=device, display_inter=1, verbose=verbose)
             if epoch % 10 == 0:
-                loss_test, acc_test = test(model, test_loader, criterion, device=device, last_layer=last_layer_test)
-
+                loss_test, acc_test = test(model, train_loader, criterion, device=device, last_layer=last_layer_test)
+                # print('Epoch [{}/{}] ({}): \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
+                    # args.epochs, name, acc_test*100., loss_test))
+            # loss_test, acc_test = test(model, test_loader, criterion, device=device, last_layer=last_layer)
             print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f} \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
                 args.epochs, name, acc_train*100., loss_train, acc_test*100., loss_test))
 
