@@ -86,12 +86,33 @@ class FCNN(nn.Module):
             x = self.activation(x)
             x = self.dropout(x)
 
+        x = x.view(x.shape[0], -1)
         self.feature = x
-        x = self.fc1(x.view(x.shape[0], -1))
+        x = self.fc1(x)
+        # self.feature = x
+
         logit = self.fc2(x)
 
-        return self.feature, logit
+        return (logit, self.feature)
 
 
+
+class TripletNet(nn.Module):
+    def __init__(self, module):
+        super(TripletNet, self).__init___()
+        self.netWork = module
+
+
+    def forward(self, data):
+        if self.trainning:
+            x0, x1, x2 = data
+            anchor, positive, negative = self.netWork(x0), self.netWork(x1), self.network(x2)
+
+            return anchor, positive, negative
+        else:
+            x = data
+            y = self.netWork(x)
+
+            return y
 
 

@@ -10,10 +10,21 @@ from datasets.dataset import *
 from attacks.attacks import *
 
 from models.model import *
+from utils.losses import *
 
 import torch.optim as optim
 
 from measurement import measure
+
+# Models descriptor
+ModelDescriptor = collections.namedtuple(
+    'ModelDescriptor',
+    [
+        'model', 
+        'train',
+        'test',
+    ])
+
 
 
 
@@ -166,6 +177,7 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size_small, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
 
+    train_loader_triplet = DataLoader(train_dataset, batch_size=args.batch_size_small)
 
     # Model Initialization
     leNet = leNet5()
@@ -173,17 +185,58 @@ def main():
     cnnGrad = CNNGrad() 
     graphTV = CNN()
     cnnFeature = FCNN()
-
-    Models = {
-        # 'leNet5': leNet,
-        # 'CNN_MNIST': cnn, 
-        # 'CNNGRAD_MNIST': cnnGrad,
-        # 'GraphTV': graphTV,
-        'CNN_Feature': cnnFeature,
-    }
     
+    _Info_cnnGrad = ModelDescriptor(
+        model = cnnGrad,
+        train = {
+            'loader': train_loader,
+            'criterion': Loss_with_Reg(nn.NLLLoss(), nn.norm),
+            'last_layer': None,
+        },
+
+        test = {
+            'loader': test_loader,
+            'criterion': nn.NLLLoss(),
+            'last_layer': None,
+        }
+    )
+
+    graphTV = GraphTVLoss(alpha=.05)
+    _Info_graphTV = ModelDescriptor(
+        model = graphTV,
+
+        train = {
+            'loader': train_loader,
+            'criterion': Loss_with_Reg(nn.CrossEntropyLoss(), graphTV),
+            'last_layer': None, 
+        },
+
+        test = {
+            'loader': test_loader,
+            'criterion': nn.CrossEntropyLoss(),
+            'last_layer': None,
+        }
+    )
+
+    # nn.TripletMarginLoss(margin=1.0, p=2),
+    _Info_Feature = ModelDescriptor(
+        model = cnnFeature,
+        
+        train = {
+            'loader': train_loader_triplet,
+            'criterion': TripletLoss(alpha=1.)
+            'last_layer': None,
+        }, 
+
+        test = {
+            'loader': test_loader,
+            'criterion': nn.CrossEntropyLoss(),
+            'last_layer': SoftMaxTV()
+        }
+    )
+
     Information_List = {
-        'leNet5': _Info_leNet5,
+        # 'leNet5': _Info_leNet5,
         'cnnGrad': _Info_cnnGrad,
         'GraphTV': _Info_graphTV,
         'CNN_Feature': _Info_Feature,
@@ -192,40 +245,28 @@ def main():
     results = []
 
     verbose = False
-    for name in Models:
-        model = Models[name]
-        if 'MNIST' in name:
-            last_layer = torch.log
-            criterion = nn.NLLLoss() 
-        elif 'Feature' in name:
-            last_layer = GraphTV(alpha=.05)
-            criterion = nn.CrossEntropyLoss()
-        else:
-            if 'GraphTV' in name:
-                last_layer = GraphTV(alpha=.01)
-                criterion = nn.NLLLoss() 
-            else:
-                last_layer = None
-                criterion = nn.CrossEntropyLoss()
+    for name in Information_List:
+        Info_ = Information_List[name]
+        model = Info_['model']
 
-        if 'Feature' in name:
-            last_layer_test = SoftMaxTV(iter=10)
-        else:
-            last_layer_test = last_layer
+        train_loader = Info_['train']['loader']
+        test_loader = Info_['test']['loader']
+        
+        criterion_train = Info_['train']['criterion']
+        criterion_test = Info_['test']['criterion']
+
+        last_layer_train = Info_['train']['last_layer']
+        last_layer_test = Info_['test']['last_layer']
+
 
         # optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-
-
         model.to(device)
         for epoch in range(args.epochs):
             loss_train, acc_train = train(model, train_loader, criterion, optimizer, epoch=epoch, last_layer=last_layer, device=device, display_inter=1, verbose=verbose)
-            if epoch % 10 == 0:
-                loss_test, acc_test = test(model, train_loader, criterion, device=device, last_layer=last_layer_test)
-                # print('Epoch [{}/{}] ({}): \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
-                    # args.epochs, name, acc_test*100., loss_test))
-            # loss_test, acc_test = test(model, test_loader, criterion, device=device, last_layer=last_layer)
+            loss_test, acc_test = test(model, train_loader, criterion, device=device, last_layer=last_layer_test)
+
             print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f} \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
                 args.epochs, name, acc_train*100., loss_train, acc_test*100., loss_test))
 
