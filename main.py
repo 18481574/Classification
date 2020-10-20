@@ -42,34 +42,45 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
     acc = 0.
     n = 0
     for itr, data in enumerate(train_loader):
-        input, target = data[0].to(device), data[1].to(device)
+        input, target = data[0], data[1]
 
-        noise = torch.randn_like(input) * 0.05
-        input = input + noise
-        output = model(input)
+        if isinstance(input, list) or isinstance(input, tuple):
+            for i in range(3):
+                input[i] = input[i].to(device)
+        else:
+            input = input.to(device)
+        target = target.to(device)
 
+        # noise = torch.randn_like(input) * 0.05
+        # input = input + noise
+        output = model(input) # y + Reg or (y1, y2, y3)
 
-        if isinstance(output, list) or isinstance(output, tuple):
+        if model.__class__.__name__.find('Triplet') > -1:
+            Loss = criterion(output, target)
+            logit = output[0][0]
+        elif isinstance(output, list) or isinstance(output, tuple):
             output, Reg = output[0], output[1]
             if last_layer is not None:
                 output = last_layer(output)
             Loss = criterion((output, Reg), target)
+            logit = output
         else:
             if last_layer is not None:
                 output = last_layer(output)
             if criterion.__class__.__name__.find('TVLoss') > -1:
                 criterion.Reg.W = GraphTVLoss._get_W(input.view(input.shape[0], -1), target=target).to(device)
             Loss = criterion(output, target)
+            logit = output
 
         optimizer.zero_grad()
         Loss.backward()
         optimizer.step()
 
-        pred = torch.argmax(output, dim=1)
+        pred = torch.argmax(logit, dim=1)
         acc += pred.eq(target).sum().item()
 
-        loss += Loss.item() * input.shape[0]
-        n += input.shape[0]
+        loss += Loss.item() * logit.shape[0]
+        n += logit.shape[0]
         
         if verbose and (itr % display_inter == 0 or n==N):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
@@ -94,11 +105,10 @@ def test(model: nn.Module, test_loader: DataLoader, criterion, last_layer=None, 
 
             output = model(input)
 
-            if isinstance(output, list) or isinstance(output, tuple):
-                output = output[0]
-
             if last_layer is not None:
-                output = last_layer(output)
+                if isinstance(output, list) or isinstance(output, tuple):
+                    for i in range(len(output)):
+                        output[i] = last_layer(output[i])
 
             Loss = criterion(output, target)
 
@@ -119,7 +129,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--batch-size-test', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=100, metavar='N',
+    parser.add_argument('--epochs', type=int, default=2000, metavar='N',
                         help='number of epochs to train (default: 100)')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate (default: 0.01)')
@@ -152,13 +162,14 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size_small, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
 
-    train_loader_triplet = DataLoader(train_dataset, batch_size=args.batch_size_small)
+    train_dataset_triplet = Triplet(train_dataset)
+    train_loader_triplet = DataLoader(train_dataset_triplet, batch_size=args.batch_size_small)
 
     # Model Initialization
     leNet = leNet5()
     cnnGrad = CNNGrad() 
     graphTV = CNN()
-    cnnFeature = FCNN()
+    cnnFeature = TripletNet(FCNN())
     
     _Info_cnnGrad = ModelDescriptor(
         model = cnnGrad,
@@ -175,7 +186,7 @@ def main():
         }
     )
 
-    graphTVLoss = GraphTVLoss(alpha=.05)
+    graphTVLoss = GraphTVLoss(alpha=.1)
     _Info_graphTV = ModelDescriptor(
         model = graphTV,
 
@@ -193,27 +204,27 @@ def main():
     )
 
     # nn.TripletMarginLoss(margin=1.0, p=2),
-    # _Info_Feature = ModelDescriptor(
-    #     model = cnnFeature,
+    _Info_Feature = ModelDescriptor(
+        model = cnnFeature,
         
-    #     train = {
-    #         'loader': train_loader_triplet,
-    #         'criterion': TripletLoss(alpha=1.),
-    #         'last_layer': None,
-    #     }, 
+        train = {
+            'loader': train_loader_triplet,
+            'criterion': CE_with_TripletLoss(alpha=1., margin=1.0, p=2),
+            'last_layer': None,
+        }, 
 
-    #     test = {
-    #         'loader': test_loader,
-    #         'criterion': nn.CrossEntropyLoss(),
-    #         'last_layer': SoftMaxTV()
-    #     }
-    # )
+        test = {
+            'loader': test_loader,
+            'criterion': nn.CrossEntropyLoss(),
+            'last_layer': SoftMaxTV()
+        }
+    )
 
     Information_List = {
         # 'leNet5': _Info_leNet5,
-        # 'cnnGrad': _Info_cnnGrad,
+        'cnnGrad': _Info_cnnGrad,
         'GraphTV': _Info_graphTV,
-        # 'CNN_Feature': _Info_Feature,
+        'CNN_Feature': _Info_Feature,
     }
 
     results = []

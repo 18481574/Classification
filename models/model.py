@@ -57,6 +57,8 @@ class FCNN(nn.Module):
         self.out_channels = out_channels
         self.drop_rate = dropout_rate
         self.channels = [self.in_channels, 16, 64]
+
+        # self.n_feature_low = 3
         self.n_feature = 1000
 
         self.feature = None # ...
@@ -89,24 +91,27 @@ class FCNN(nn.Module):
         x = x.view(x.shape[0], -1)
         self.feature = x
         x = self.fc1(x)
+        x = self.activation(x)
         # self.feature = x
 
         logit = self.fc2(x)
-
-        return (logit, self.feature)
+        
+        if self.training:
+            return (logit, self.feature)
+        else:
+            return logit
 
 
 
 class TripletNet(nn.Module):
     def __init__(self, module):
-        super(TripletNet, self).__init___()
+        super(TripletNet, self).__init__()
         self.netWork = module
 
-
     def forward(self, data):
-        if self.trainning:
+        if self.training:
             x0, x1, x2 = data
-            anchor, positive, negative = self.netWork(x0), self.netWork(x1), self.network(x2)
+            anchor, positive, negative = self.netWork(x0), self.netWork(x1), self.netWork(x2)
 
             return anchor, positive, negative
         else:

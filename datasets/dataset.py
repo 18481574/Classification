@@ -8,9 +8,11 @@ from torch.utils.data import Dataset, Subset
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
+import random
+
 import collections
 
-__all__ = ['DataSet', 'print_path']
+__all__ = ['DataSet', 'Triplet', ]
 
 def print_path():
     path = os.getcwd()
@@ -124,6 +126,7 @@ class DataSet(Dataset):
                 self.small_idx = list(range(0, len(self.data_src), skip))[:self.N]
                 # print(self.small_idx, type(self.target_src), len(self.target_src), type(self.small_idx))
 
+
     @property
     def data(self):
         if self.aug:
@@ -221,3 +224,32 @@ def _cifar10_load(files_dir, train):
 # need to unify the format of dataset
 def _dataset_load(files_dir, dataset, split):
     return []
+
+
+
+class Triplet(Dataset):
+    def __init__(self, dataset):
+        super(Triplet, self).__init__()
+        self.dataset = dataset
+
+        self.num_classes = dataset.num_classes
+        self.all_classes = set(range(self.num_classes))    
+        self.idxes = [ set((dataset.target.view(-1)==idx).nonzero().view(-1).numpy()) for idx in range(self.num_classes)]
+
+    def __getitem__(self, idx):
+        anchor = self.dataset.data[idx]
+        target = self.dataset.target[idx]
+
+        label_pos = int(target)
+        label_neg = random.choice(tuple(self.all_classes - {label_pos}))
+
+        idx_pos = random.choice(tuple(self.idxes[label_pos] - {idx}))
+        idx_neg = random.choice(tuple(self.idxes[label_neg]))
+
+        positive = self.dataset.data[idx_pos]
+        negtive = self.dataset.data[idx_neg]
+
+        return (anchor, positive, negtive), target
+
+    def __len__(self):
+        return len(self.dataset)

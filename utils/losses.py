@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-__all__ = ['Loss_with_Reg', 'CETVLoss']
+__all__ = ['Loss_with_Reg', 'CETVLoss', 'CE_with_TripletLoss',]
 
 class Loss_with_Reg(nn.Module):
     def __init__(self, criterion_L, criterion_Reg):
@@ -12,7 +12,7 @@ class Loss_with_Reg(nn.Module):
 
     def forward(self, data, target):
         x, y = data[0], data[1]
-        print('shape = ', x.shape,)
+        # print('shape = ', x.shape,)
         Loss = self.criterion_L(x, target)
 
         if isinstance(y, list) or isinstance(y, tuple):
@@ -31,11 +31,36 @@ class CrossEntropy_with_GraphTVLoss(nn.Module):
         self.Reg = graphTVLoss
 
     def forward(self, x, target):
-        # Loss = nn.CrossEntropyLoss()(x, target)
-        Loss = nn.NLLLoss()(torch.log(x), target)
-        Loss_Reg = self.Reg(x)
+        Loss = nn.CrossEntropyLoss()(x, target)
+        # Loss = nn.NLLLoss()(torch.log(x), target)
+        Loss_Reg = self.Reg(nn.Softmax(dim=1)(x))
 
         return Loss + Loss_Reg
 
 
 CETVLoss = CrossEntropy_with_GraphTVLoss
+
+
+class CE_with_TripletLoss(nn.Module):
+    def __init__(self, alpha=1., margin=1., p=2):
+        super(CE_with_TripletLoss, self).__init__()
+        self.CE = nn.CrossEntropyLoss()
+        self.Reg = nn.TripletMarginLoss(margin=margin, p=p)
+
+        self.alpha = alpha
+
+    def forward(self, data, target):
+        if self.training:
+            # x0, x1, x2 = data[0][0], data[1][0], data[2][0]
+            x0 = data[0][0]
+            f0, f1, f2 = data[0][1], data[1][1], data[2][1]
+            # print(len(data), type(data))
+            # print(len(x0), type(x0))
+            Loss = self.CE(x0, target)
+            Reg = self.Reg(f0, f1, f2)
+
+            return Loss + Reg
+        else:
+            Loss = self.CE(data, target)
+
+            return Loss

@@ -201,8 +201,9 @@ class CNN_MNIST_Grad(nn.Module):
 
         if self.training:
             self.grad = self.Gradient()
-
-        return torch.log(y), self.grad
+            return torch.log(y), self.grad
+        else:
+            return torch.log(y)
 
     def Gradient(self):
         grads = []
@@ -267,7 +268,7 @@ class CNN_MNIST(nn.Module):
         y = self.fc1(y.view(-1, int(self.input_size/4)**2*self.num_channels[1]))
         y = self.activation3(y)
         y = self.fc2(y)
-        y = self.softmax(y)
+        # y = self.softmax(y)
         return y
 
 def main():
