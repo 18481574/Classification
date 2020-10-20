@@ -9,7 +9,7 @@ from .GraphTV import *
 CNNGrad = CNN_MNIST_Grad
 CNN = CNN_MNIST
 
-__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTV', 'FCNN', 'SoftMaxTV', 'TripletNet', ]
+__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTVLoss', 'FCNN', 'SoftMaxTV', 'TripletNet', ]
 
 
 

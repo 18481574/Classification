@@ -16,6 +16,8 @@ import torch.optim as optim
 
 from measurement import measure
 
+import collections
+
 # Models descriptor
 ModelDescriptor = collections.namedtuple(
     'ModelDescriptor',
@@ -24,8 +26,6 @@ ModelDescriptor = collections.namedtuple(
         'train',
         'test',
     ])
-
-
 
 
 def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torch.optim, epoch:int, last_layer=None, display_inter=1, device=torch.device('cpu'), verbose=False):
@@ -48,32 +48,18 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
         input = input + noise
         output = model(input)
 
-        if last_layer is not None:
-            if 'GraphTV' in last_layer.__class__.__name__:
-                if 'FCNN' in model.__class__.__name__:
-                    processed = output
-                    last_layer.W = last_layer._get_W(input.view(input.shape[0], -1), last_layer.n_Neigbr, last_layer.n_sig, target).to(device)
-                    # last_layer.W = last_layer._get_W(model.feature.view(input.shape[0], -1), last_layer.n_Neigbr, last_layer.n_sig).to(device)
-                    
-                    Loss_Reg = last_layer(model.feature.view(input.shape[0], -1))
-                else:
-                    processed = torch.log(output)
-                    last_layer.W = last_layer._get_W(input.view(input.shape[0], -1), last_layer.n_Neigbr, last_layer.n_sig, target).to(device)
-                    Loss_Reg = last_layer(output)
 
-                Loss = criterion(processed, target) + Loss_Reg
-                # print(Loss.item(), Loss_Reg.item())
-            else: # GradTV
-                processed = last_layer(output)
-                if 'GradientLoss' in dir(model):
-                    Loss_Reg = model.GradientLoss()
-                    Loss = criterion(processed, target) + Loss_Reg
-                else:
-                    Loss = criterion(processed, target)
-                # print(Loss.item(), Loss_Reg.item())
+        if isinstance(output, list) or isinstance(output, tuple):
+            output, Reg = output[0], output[1]
+            if last_layer is not None:
+                output = last_layer(output)
+            Loss = criterion((output, Reg), target)
         else:
+            if last_layer is not None:
+                output = last_layer(output)
+            if criterion.__class__.__name__.find('TVLoss') > -1:
+                criterion.Reg.W = GraphTVLoss._get_W(input.view(input.shape[0], -1), target=target).to(device)
             Loss = criterion(output, target)
-
 
         optimizer.zero_grad()
         Loss.backward()
@@ -108,24 +94,13 @@ def test(model: nn.Module, test_loader: DataLoader, criterion, last_layer=None, 
 
             output = model(input)
 
-            if 'SoftMaxTV' in last_layer.__class__.__name__:
-                N_ = input.shape[0]//10
-                last_layer.W = GraphTV._get_W(model.feature.view(input.shape[0], -1), n_Neigbr=N_, n_sig=7).to(device)
-                output = last_layer(output)
+            if isinstance(output, list) or isinstance(output, tuple):
+                output = output[0]
 
             if last_layer is not None:
-                if 'GraphTV' or last_layer.__class__.__name__:
-                    if 'FCNN' in model.__class__.__name__:
-                        processed = output
-                    else:
-                        processed = torch.log(output)
+                output = last_layer(output)
 
-                    Loss = criterion(processed, target) 
-                else: # GradTV
-                    processed = last_layer(output)
-                    Loss = criterion(processed, target)
-            else:
-                Loss = criterion(output, target)
+            Loss = criterion(output, target)
 
             loss += Loss.item() * input.shape[0]
             n += input.shape[0]
@@ -144,7 +119,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--batch-size-test', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=500, metavar='N',
+    parser.add_argument('--epochs', type=int, default=100, metavar='N',
                         help='number of epochs to train (default: 100)')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate (default: 0.01)')
@@ -181,7 +156,6 @@ def main():
 
     # Model Initialization
     leNet = leNet5()
-    cnn = CNN()
     cnnGrad = CNNGrad() 
     graphTV = CNN()
     cnnFeature = FCNN()
@@ -190,7 +164,7 @@ def main():
         model = cnnGrad,
         train = {
             'loader': train_loader,
-            'criterion': Loss_with_Reg(nn.NLLLoss(), nn.norm),
+            'criterion': Loss_with_Reg(nn.NLLLoss(), torch.norm),
             'last_layer': None,
         },
 
@@ -201,13 +175,13 @@ def main():
         }
     )
 
-    graphTV = GraphTVLoss(alpha=.05)
+    graphTVLoss = GraphTVLoss(alpha=.05)
     _Info_graphTV = ModelDescriptor(
         model = graphTV,
 
         train = {
             'loader': train_loader,
-            'criterion': Loss_with_Reg(nn.CrossEntropyLoss(), graphTV),
+            'criterion': CETVLoss(graphTVLoss),
             'last_layer': None, 
         },
 
@@ -219,27 +193,27 @@ def main():
     )
 
     # nn.TripletMarginLoss(margin=1.0, p=2),
-    _Info_Feature = ModelDescriptor(
-        model = cnnFeature,
+    # _Info_Feature = ModelDescriptor(
+    #     model = cnnFeature,
         
-        train = {
-            'loader': train_loader_triplet,
-            'criterion': TripletLoss(alpha=1.)
-            'last_layer': None,
-        }, 
+    #     train = {
+    #         'loader': train_loader_triplet,
+    #         'criterion': TripletLoss(alpha=1.),
+    #         'last_layer': None,
+    #     }, 
 
-        test = {
-            'loader': test_loader,
-            'criterion': nn.CrossEntropyLoss(),
-            'last_layer': SoftMaxTV()
-        }
-    )
+    #     test = {
+    #         'loader': test_loader,
+    #         'criterion': nn.CrossEntropyLoss(),
+    #         'last_layer': SoftMaxTV()
+    #     }
+    # )
 
     Information_List = {
         # 'leNet5': _Info_leNet5,
-        'cnnGrad': _Info_cnnGrad,
+        # 'cnnGrad': _Info_cnnGrad,
         'GraphTV': _Info_graphTV,
-        'CNN_Feature': _Info_Feature,
+        # 'CNN_Feature': _Info_Feature,
     }
 
     results = []
@@ -247,16 +221,18 @@ def main():
     verbose = False
     for name in Information_List:
         Info_ = Information_List[name]
-        model = Info_['model']
+        model = Info_.model
+        train_ = Info_.train
+        test_ = Info_.test
 
-        train_loader = Info_['train']['loader']
-        test_loader = Info_['test']['loader']
+        train_loader = train_['loader']
+        test_loader = test_['loader']
         
-        criterion_train = Info_['train']['criterion']
-        criterion_test = Info_['test']['criterion']
+        criterion_train = train_['criterion']
+        criterion_test = test_['criterion']
 
-        last_layer_train = Info_['train']['last_layer']
-        last_layer_test = Info_['test']['last_layer']
+        last_layer_train = train_['last_layer']
+        last_layer_test = test_['last_layer']
 
 
         # optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
@@ -264,8 +240,8 @@ def main():
 
         model.to(device)
         for epoch in range(args.epochs):
-            loss_train, acc_train = train(model, train_loader, criterion, optimizer, epoch=epoch, last_layer=last_layer, device=device, display_inter=1, verbose=verbose)
-            loss_test, acc_test = test(model, train_loader, criterion, device=device, last_layer=last_layer_test)
+            loss_train, acc_train = train(model, train_loader, criterion_train, optimizer, epoch=epoch, last_layer=last_layer_train, device=device, display_inter=1, verbose=verbose)
+            loss_test, acc_test = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
 
             print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f} \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
                 args.epochs, name, acc_train*100., loss_train, acc_test*100., loss_test))

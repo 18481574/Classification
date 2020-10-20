@@ -5,7 +5,7 @@ import torch.sparse as sparse
 
 from sklearn.neighbors import NearestNeighbors
 
-__all__ = ['GraphTV', 'SoftMaxTV']
+__all__ = ['GraphTVLoss', 'SoftMaxTV']
 
 
 # Example:
@@ -16,9 +16,9 @@ __all__ = ['GraphTV', 'SoftMaxTV']
 # 	loss_TV = layer(output, W) 
 #   loss_TV.backward()...
 # 
-class GraphTV(nn.Module):
+class GraphTVLoss(nn.Module):
     def __init__(self, n=100, alpha=1., n_Neigbr=15, n_sig=8):
-        super(GraphTV, self).__init__()
+        super(GraphTVLoss, self).__init__()
         self.n = n
         
         self.n_Neigbr = min(n, n_Neigbr)

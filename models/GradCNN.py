@@ -179,7 +179,7 @@ class CNN_MNIST_Grad(nn.Module):
         self.activation3 = SigmoidGrad()
         self.fc2 = LinearGrad(1000, self.num_class)
         self.softmax = SoftMax()
-        self.grad = {}
+        self.grad = None
 
         self.alpha = alpha
 
@@ -198,9 +198,14 @@ class CNN_MNIST_Grad(nn.Module):
         y = self.activation3(y)
         y = self.fc2(y)
         y = self.softmax(y)
-        return y
 
-    def GradientLoss(self):
+        if self.training:
+            self.grad = self.Gradient()
+
+        return torch.log(y), self.grad
+
+    def Gradient(self):
+        grads = []
         for i in range(self.num_class):
             grad = self.softmax.Gradient(i)
             # grad = torch.mm(g.view(-1,self.num_class), self.fc1.weight)
@@ -218,34 +223,11 @@ class CNN_MNIST_Grad(nn.Module):
             grad = self.activation1.Gradient(grad)
             grad = self.pool1.Gradient(grad)
             grad = self.conv1.Gradient(grad)
-            # self.grad[i] = grad
 
-            Loss = torch.norm(grad) # default is 'frob'
+            grads.append(grad * self.alpha)
 
-            if i>0: 
-                Loss_sum = Loss_sum + Loss
-            else:
-                Loss_sum = Loss
-            
-        # return self.grad
-        return Loss_sum * self.alpha
+        return grads
 
-        # for j in range(1):
-        #     i = np.random.randint(10)
-        #     grad = self.softmax.Gradient(i)
-        #     # grad = torch.mm(g.view(-1,self.num_class), self.fc1.weight)
-        #     grad = self.fc1.Gradient(grad)
-        #     grad = grad.view(-1, self.num_channels[1], int(self.input_size/4), int(self.input_size/4))
-        #     grad = self.dropout2.Gradient(grad)
-        #     grad = self.activation2.Gradient(grad)
-        #     grad = self.pool2.Gradient(grad)
-        #     grad = self.conv2.Gradient(grad)
-        #     grad = self.dropout1.Gradient(grad)
-        #     grad = self.activation1.Gradient(grad)
-        #     grad = self.pool1.Gradient(grad)
-        #     grad = self.conv1.Gradient(grad)
-        #     self.grad[j] = grad
-        # return self.grad
 
 
 class CNN_MNIST(nn.Module):
