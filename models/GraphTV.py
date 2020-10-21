@@ -5,7 +5,7 @@ import torch.sparse as sparse
 
 from sklearn.neighbors import NearestNeighbors
 
-__all__ = ['GraphTVLoss', 'SoftMaxTV']
+__all__ = ['GraphTVLoss', 'SoftMaxTV', 'ReLUTV', ]
 
 
 # Example:
@@ -29,9 +29,10 @@ class GraphTVLoss(nn.Module):
     def forward(self, x):
         # W = self._get_W(x, self.n_Neigbr, self.n_sig)
         Wx = self.W.matmul(x)
-        norm_ = Wx.norm(dim=1)
+        norm_ = Wx.norm(dim=1).sum() # TV
+        # norm_ = Wx.abs().sum()
 
-        return self.alpha *  torch.mean(norm_)
+        return self.alpha *  norm_
 
 
     def _upd(self, n = 100, alpha=1.0):
@@ -52,7 +53,8 @@ class GraphTVLoss(nn.Module):
         nbrs = NearestNeighbors(n_neighbors=n_Neigbr, algorithm='ball_tree').fit(X)
 
         dis, idx = nbrs.kneighbors(X)
-        dis2 = np.exp(- dis**2 / dis[:, n_sig-1:n_sig] / 2 )
+        dis2 = np.exp(- dis**2 / dis[:, n_sig-1:n_sig] / 2 ) # TV
+        # dis2 = np.exp(- dis**2 / dis[:, n_sig-1:n_sig] ) # Aniso-TV
 
         if target is None:
             M = (n_Neigbr - 1) * N
@@ -97,6 +99,9 @@ class SoftMaxTV(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
+        if self.W == None:
+            raise ValueError('Must Give W first...')
+
         grad = self.W.matmul(self.softmax(x))
         eta = torch.zeros_like(grad)
 
@@ -106,3 +111,27 @@ class SoftMaxTV(nn.Module):
             grad = self.W.matmul(self.softmax(x))
 
         return x  # return logit instead of SoftMax
+
+class ReLUTV(nn.Module):
+    def __init__(self, alpha=1., tau=.1, iter=1, W=None):
+        super(ReLUTV, self).__init__()
+        self.W = None
+        self.alpha = alpha
+        self.tau = tau*alpha
+        self.iter = iter
+
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        if self.W == None:
+            raise ValueError('Must Give W first...')
+
+        grad = self.W.matmul(self.relu(x))
+        eta = torch.zeros_like(grad)
+
+        for i in range(self.iter):
+            eta = nn.functional.normalize(eta + self.tau * grad)
+            x = x - self.alha * self.W.transpose(0, 1).matmul(grad)
+            grad = self.W.matmul(self.relu(x))
+
+        return self.relu(x)

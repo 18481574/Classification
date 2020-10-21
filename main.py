@@ -68,7 +68,8 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
             if last_layer is not None:
                 output = last_layer(output)
             if criterion.__class__.__name__.find('TVLoss') > -1:
-                criterion.Reg.W = GraphTVLoss._get_W(input.view(input.shape[0], -1), target=target).to(device)
+                target_ = None
+                criterion.Reg.W = GraphTVLoss._get_W(input.view(input.shape[0], -1), target=target_).to(device)
             Loss = criterion(output, target)
             logit = output
 
@@ -129,7 +130,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--batch-size-test', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=2000, metavar='N',
+    parser.add_argument('--epochs', type=int, default=1000, metavar='N',
                         help='number of epochs to train (default: 100)')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate (default: 0.01)')
@@ -222,9 +223,9 @@ def main():
 
     Information_List = {
         # 'leNet5': _Info_leNet5,
-        'cnnGrad': _Info_cnnGrad,
+        # 'cnnGrad': _Info_cnnGrad,
         'GraphTV': _Info_graphTV,
-        'CNN_Feature': _Info_Feature,
+        # 'CNN_Feature': _Info_Feature,
     }
 
     results = []

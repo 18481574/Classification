@@ -5,12 +5,17 @@ import torch.nn.functional as F
 
 from .GradCNN import CNN_MNIST, CNN_MNIST_Grad
 from .GraphTV import *
+from .extend_layers import *
 
 CNNGrad = CNN_MNIST_Grad
 CNN = CNN_MNIST
 
-__all__ = ['leNet5', 'CNN', 'CNNGrad', 'GraphTVLoss', 'FCNN', 'SoftMaxTV', 'TripletNet', ]
+_Models = ['leNet5', 'CNN', 'CNNGrad', 'FCNN', 'TripletNet', 'TripletNetTV', 'ClassifierTV',]
+_Loss_layers = ['GraphTVLoss',]
+_Activation_layers = ['SoftMaxTV', 'ReLUTV',]
+_Misc = []
 
+__all__ = _Models + _Loss_layers + _Activation_layers + _Misc
 
 
 class leNet5(nn.Module):
@@ -120,4 +125,82 @@ class TripletNet(nn.Module):
 
             return y
 
+
+class TripletNetTV(nn.Module):
+    def __init__(self, embedding, classifier, alpha=.1, reg_criterion=None):
+        super(TripletNetTV, self).__init__()
+        self.embedding = embedding
+        self.classifier = ClassifierTV(classifier)
+        self.alpha = alpha
+
+        self.TV_active = False
+        self._deactivate()
+
+        if reg_criterion is None:
+            self.reg = nn.TripletMarginLoss(margin=1., p=2)
+        else:
+            self.reg = reg_criterion
+
+    def forward(self, data):
+        if self.training:
+            x0, x1, x2 = data
+            anchor, positive, negative = self.embedding(x0), self.embedding(x1), self.embedding(x2)
+
+            prev_state = self.TV_active
+            self._deactivate()
+            logit = self.classifier(anchor)
+            self._activate(prev_state)
+
+            Loss_reg = self.reg(anchor, positive, negtive)
+
+            return logit, Loss_reg*self.alpha
+        else:
+            feature = self.embedding(data)
+            
+            if self.TV_active:
+                self.classifier.W = GraphTVLoss._get_W(feature)
+
+            logit = self.classifier(feature)
+
+            return logit
+
+
+    def _deactivate(self):
+        self._activate(False)
+
+    def _activate(self, state=True):
+        if self.classifier.TV_active != state:
+            self.classifier._activate(state)
+        self.TV_active = state
+
+
+
+class ClassifierTV(nn.Module):
+    def __init__(self, classifier, relu=ReLUTV(), softmax=SoftMaxTV()):
+        super(ClassifierTV, self).__init__()
+        self.W = None
+        self.TV_active = False
+
+        self.classifier = classifier
+        self.relu_prev = classifier.relu
+        self.relu = relu
+        self.softmax = softmax
+
+    def forward(self, x):
+        if self.TV_active:
+            self.relu.W = self.W
+            self.softmax.W = self.W
+            self.classifier.relu = self.relu
+        else:
+            self.classifier.relu = self.relu_prev
+
+        logit = self.classifier(x)
+
+        if self.TV_active:
+            logit = self.softmax(logit)
+
+        return logit
+
+    def _activate(self, state):
+        self.TV_active = state
 
