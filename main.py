@@ -57,7 +57,9 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
 
         if model.__class__.__name__.find('Triplet') > -1:
             Loss = criterion(output, target)
-            logit = output[0][0]
+            logit = output[0]
+            if isinstance(logit, tuple) or isinstance(logit, list):
+                logit = logit[0]
         elif isinstance(output, list) or isinstance(output, tuple):
             output, Reg = output[0], output[1]
             if last_layer is not None:
@@ -130,7 +132,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--batch-size-test', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=1000, metavar='N',
+    parser.add_argument('--epochs', type=int, default=300, metavar='N',
                         help='number of epochs to train (default: 100)')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate (default: 0.01)')
@@ -221,11 +223,29 @@ def main():
         }
     )
 
+    tripletNetTV = TripletNetTV()
+    _Info_TripletTV = ModelDescriptor(
+        model = tripletNetTV,
+
+        train = {
+            'loader': train_loader_triplet,
+            'criterion': CE_with_RegLoss(),
+            'last_layer': None
+        },
+
+        test = {
+            'loader': test_loader,
+            'criterion': nn.CrossEntropyLoss(),
+            'last_layer': None
+        }
+    )
+
     Information_List = {
         # 'leNet5': _Info_leNet5,
-        # 'cnnGrad': _Info_cnnGrad,
-        'GraphTV': _Info_graphTV,
-        # 'CNN_Feature': _Info_Feature,
+        'cnnGrad': _Info_cnnGrad,
+        # 'GraphTV': _Info_graphTV,
+        'CNN_Feature': _Info_Feature,
+        'TripletTV': _Info_TripletTV,
     }
 
     results = []
@@ -254,6 +274,10 @@ def main():
         for epoch in range(args.epochs):
             loss_train, acc_train = train(model, train_loader, criterion_train, optimizer, epoch=epoch, last_layer=last_layer_train, device=device, display_inter=1, verbose=verbose)
             loss_test, acc_test = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
+
+            # model._deactivate()
+            # loss_test1, acc_test1 = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
+            # model._activate()
 
             print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f} \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
                 args.epochs, name, acc_train*100., loss_train, acc_test*100., loss_test))

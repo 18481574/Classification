@@ -131,7 +131,7 @@ class ReLUTV(nn.Module):
 
         for i in range(self.iter):
             eta = nn.functional.normalize(eta + self.tau * grad)
-            x = x - self.alha * self.W.transpose(0, 1).matmul(grad)
+            x = x - self.alpha * self.W.transpose(0, 1).matmul(grad)
             grad = self.W.matmul(self.relu(x))
 
         return self.relu(x)

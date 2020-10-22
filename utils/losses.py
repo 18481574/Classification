@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-__all__ = ['Loss_with_Reg', 'CETVLoss', 'CE_with_TripletLoss',]
+__all__ = ['Loss_with_Reg', 'CETVLoss', 'CE_with_TripletLoss', 'CE_with_RegLoss',]
 
 class Loss_with_Reg(nn.Module):
     def __init__(self, criterion_L, criterion_Reg):
@@ -57,10 +57,21 @@ class CE_with_TripletLoss(nn.Module):
             # print(len(data), type(data))
             # print(len(x0), type(x0))
             Loss = self.CE(x0, target)
-            Reg = self.Reg(f0, f1, f2)
+            Reg = self.Reg(f0, f1, f2) * self.alpha
 
             return Loss + Reg
         else:
             Loss = self.CE(data, target)
 
             return Loss
+
+class CE_with_RegLoss(nn.Module):
+    def __init__(self):
+        super(CE_with_RegLoss, self).__init__()
+
+        self.CE = nn.CrossEntropyLoss()
+
+    def forward(self, data, target):
+        x, loss_reg = data[0], data[1]
+
+        return self.CE(x, target) + loss_reg

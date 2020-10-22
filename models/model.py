@@ -5,7 +5,6 @@ import torch.nn.functional as F
 
 from .GradCNN import CNN_MNIST, CNN_MNIST_Grad
 from .GraphTV import *
-from .extend_layers import *
 
 CNNGrad = CNN_MNIST_Grad
 CNN = CNN_MNIST
@@ -107,6 +106,49 @@ class FCNN(nn.Module):
             return logit
 
 
+# 64 -> 10
+class EmbeddingNet(nn.Module):
+    def __init__(self):
+        super(EmbeddingNet, self).__init__()
+        self.channels = [1, 16, 64]
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(16, 64, kernel_size=3, padding=1)
+        self.maxPool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.maxPool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # self.relu = nn.ReLU()
+        self.relu = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.maxPool1(x)
+        x = self.relu(x)
+
+        x = self.conv2(x)
+        x = self.maxPool2(x)
+        x = self.relu(x)
+
+        return x
+
+
+class Classifier_MNIST(nn.Module):
+    def __init__(self):
+        super(Classifier_MNIST, self).__init__()
+        CHW = 64 * 49
+        feature = 1000
+        self.fc1 = nn.Linear(CHW, feature)
+        # self.relu = nn.ReLU()
+        self.relu = nn.Sigmoid()
+        self.fc2 = nn.Linear(feature, 10)
+
+    def forward(self, x):
+        if x.dim()>2:
+            x = x.view(x.shape[0], -1)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+
+        return x
 
 class TripletNet(nn.Module):
     def __init__(self, module):
@@ -127,14 +169,14 @@ class TripletNet(nn.Module):
 
 
 class TripletNetTV(nn.Module):
-    def __init__(self, embedding, classifier, alpha=.1, reg_criterion=None):
+    def __init__(self, embedding=EmbeddingNet(), classifier=Classifier_MNIST(), alpha=1., reg_criterion=None, active=False):
         super(TripletNetTV, self).__init__()
         self.embedding = embedding
         self.classifier = ClassifierTV(classifier)
         self.alpha = alpha
 
-        self.TV_active = False
-        self._deactivate()
+        self.TV_active = active
+        self._activate(active)
 
         if reg_criterion is None:
             self.reg = nn.TripletMarginLoss(margin=1., p=2)
@@ -144,21 +186,21 @@ class TripletNetTV(nn.Module):
     def forward(self, data):
         if self.training:
             x0, x1, x2 = data
-            anchor, positive, negative = self.embedding(x0), self.embedding(x1), self.embedding(x2)
+            anchor, positive, negtive = self.embedding(x0), self.embedding(x1), self.embedding(x2)
 
             prev_state = self.TV_active
             self._deactivate()
             logit = self.classifier(anchor)
             self._activate(prev_state)
 
+            # Loss_reg = self.reg(anchor.view(anchor.shape[0], -1), positive.view(positive.shape[0], -1), negtive.view(negtive.shape[0], -1))
             Loss_reg = self.reg(anchor, positive, negtive)
-
             return logit, Loss_reg*self.alpha
         else:
             feature = self.embedding(data)
             
             if self.TV_active:
-                self.classifier.W = GraphTVLoss._get_W(feature)
+                self.classifier.W = GraphTVLoss._get_W(feature.view(feature.shape[0], -1)).to(feature.device)
 
             logit = self.classifier(feature)
 
