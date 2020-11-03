@@ -67,7 +67,8 @@ class FCNN(nn.Module):
 
         self.feature = None # ...
 
-        self.activation = nn.Sigmoid()
+        # self.activation = nn.Sigmoid()
+        self.activation = nn.ReLU()
         self.dropout = nn.Dropout2d(p=self.drop_rate)
 
         self.convs = []
@@ -116,8 +117,8 @@ class EmbeddingNet(nn.Module):
         self.maxPool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.maxPool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # self.relu = nn.ReLU()
-        self.relu = nn.Sigmoid()
+        self.relu = nn.ReLU()
+        # self.relu = nn.Sigmoid()
 
     def forward(self, x):
         x = self.conv1(x)
@@ -137,8 +138,8 @@ class Classifier_MNIST(nn.Module):
         CHW = 64 * 49
         feature = 1000
         self.fc1 = nn.Linear(CHW, feature)
-        # self.relu = nn.ReLU()
-        self.relu = nn.Sigmoid()
+        self.relu = nn.ReLU()
+        # self.relu = nn.Sigmoid()
         self.fc2 = nn.Linear(feature, 10)
 
     def forward(self, x):
@@ -169,7 +170,7 @@ class TripletNet(nn.Module):
 
 
 class TripletNetTV(nn.Module):
-    def __init__(self, embedding=EmbeddingNet(), classifier=Classifier_MNIST(), alpha=1., reg_criterion=None, active=False):
+    def __init__(self, embedding=EmbeddingNet(), classifier=Classifier_MNIST(), alpha=1., reg_criterion=None, active=True):
         super(TripletNetTV, self).__init__()
         self.embedding = embedding
         self.classifier = ClassifierTV(classifier)

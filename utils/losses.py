@@ -30,10 +30,17 @@ class CrossEntropy_with_GraphTVLoss(nn.Module):
         super(CrossEntropy_with_GraphTVLoss, self).__init__()
         self.Reg = graphTVLoss
 
-    def forward(self, x, target):
+    def forward(self, data, target):
+        if isinstance(data, tuple) or isinstance(data, list):
+            x, feature = data[0], nn.functional.normalize(data[1], dim=1)
+        else:
+            x = data
+            feature = data
+
         Loss = nn.CrossEntropyLoss()(x, target)
         # Loss = nn.NLLLoss()(torch.log(x), target)
-        Loss_Reg = self.Reg(nn.Softmax(dim=1)(x))
+        Loss_Reg = self.Reg(feature)
+
 
         return Loss + Loss_Reg
 

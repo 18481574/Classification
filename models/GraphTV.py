@@ -24,14 +24,19 @@ class GraphTVLoss(nn.Module):
         self.n_Neigbr = min(n, n_Neigbr)
         self.n_sig = min(n_Neigbr, n_sig)
         self.W = None
-        self.alpha = alpha 
+        self.alpha = alpha
 
     def forward(self, x):
+        if self.W is None:
+            W_ = self._get_W(x, self.n_Neigbr, self.n_sig).to(x.device)
+        else:
+            W_ = self.W
+
         # W = self._get_W(x, self.n_Neigbr, self.n_sig)
-        Wx = self.W.matmul(x)
+        Wx = W_.matmul(x)
         norm_ = Wx.norm(dim=1).sum() # TV
         # norm_ = Wx.abs().sum()
-
+        
         return self.alpha *  norm_
 
 
@@ -113,7 +118,7 @@ class SoftMaxTV(nn.Module):
         return x  # return logit instead of SoftMax
 
 class ReLUTV(nn.Module):
-    def __init__(self, alpha=1., tau=.1, iter=1, W=None):
+    def __init__(self, alpha=1., tau=.1, iter=0, W=None):
         super(ReLUTV, self).__init__()
         self.W = None
         self.alpha = alpha

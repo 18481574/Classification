@@ -76,6 +76,19 @@ class SigmoidGrad(nn.Module):
         grad = grad * x
         return grad
 
+class ReLUGrad(nn.Module):
+    def __init__(self):
+        super(ReLUGrad, self).__init__()
+        self.channels = torch.tensor([])
+
+    def forward(self, x):
+        self.channels = nn.functional.relu(x)
+        return self.channels
+
+    def Gradient(self, x):
+        return x * torch.sign(self.channels) 
+
+
 class TahnGrad(nn.Module):
     def __init__(self):
         super(TahnGrad, self).__init__()
@@ -112,9 +125,10 @@ class SoftMax(nn.Module):
         self.channels = torch.tensor([])
 
     def forward(self, x):
-        y = torch.exp(x)
-        self.sum = torch.sum(y, dim=1).view(-1,1)
-        y = y / self.sum
+        # y = torch.exp(x)
+        # self.sum = torch.sum(y, dim=1).view(-1,1)
+        # y = y / self.sum
+        y = nn.Softmax(dim=1)(x)
         self.channels = y
         return y
 
@@ -168,15 +182,18 @@ class CNN_MNIST_Grad(nn.Module):
         self.device = device
         self.num_channels=[16, 64]
         self.conv1 = ConvGrad(in_channels=self.in_channels, out_channels=self.num_channels[0], kernel_size=3, input_size=self.input_size)
-        self.activation1 = SigmoidGrad()
+        # self.activation1 = SigmoidGrad()
+        self.activation1 = ReLUGrad()
         self.dropout1 = DropoutGrad(self.prob, device=device)
         self.pool1 = MaxPoolGrad()
         self.conv2 = ConvGrad(in_channels=self.num_channels[0], out_channels=self.num_channels[1], kernel_size=3, input_size=self.input_size)
-        self.activation2 = SigmoidGrad()
+        # self.activation2 = SigmoidGrad()
+        self.activation2 = ReLUGrad()
         self.dropout2 = DropoutGrad(self.prob, device=device)
         self.pool2 = MaxPoolGrad()
         self.fc1 = LinearGrad(self.num_channels[1]*int(input_size/4)**2, 1000)
-        self.activation3 = SigmoidGrad()
+        # self.activation3 = SigmoidGrad()
+        self.activation3 = ReLUGrad()
         self.fc2 = LinearGrad(1000, self.num_class)
         self.softmax = SoftMax()
         self.grad = None
@@ -196,14 +213,14 @@ class CNN_MNIST_Grad(nn.Module):
             y = self.dropout2(y, self.training)
         y = self.fc1(y.view(-1, int(self.input_size/4)**2*self.num_channels[1]))
         y = self.activation3(y)
-        y = self.fc2(y)
-        y = self.softmax(y)
+        logit = self.fc2(y)
+        y = self.softmax(logit)
 
         if self.training:
             self.grad = self.Gradient()
-            return torch.log(y), self.grad
+            return logit, self.grad
         else:
-            return torch.log(y)
+            return logit
 
     def Gradient(self):
         grads = []
@@ -242,15 +259,18 @@ class CNN_MNIST(nn.Module):
         self.device = device
         self.num_channels=[16, 64]
         self.conv1 = ConvGrad(in_channels=self.in_channels, out_channels=self.num_channels[0], kernel_size=3, input_size=self.input_size)
-        self.activation1 = SigmoidGrad()
+        # self.activation1 = SigmoidGrad()
+        self.activation1 = ReLUGrad()
         self.dropout1 = DropoutGrad(self.prob, device=device)
         self.pool1 = MaxPoolGrad()
         self.conv2 = ConvGrad(in_channels=self.num_channels[0], out_channels=self.num_channels[1], kernel_size=3, input_size=self.input_size)
-        self.activation2 = SigmoidGrad()
+        # self.activation2 = SigmoidGrad()
+        self.activation1 = ReLUGrad()
         self.dropout2 = DropoutGrad(self.prob, device=device)
         self.pool2 = MaxPoolGrad()
         self.fc1 = LinearGrad(self.num_channels[1]*int(input_size/4)**2, 1000)
-        self.activation3 = SigmoidGrad()
+        # self.activation3 = SigmoidGrad()
+        self.activation1 = ReLUGrad()
         self.fc2 = LinearGrad(1000, self.num_class)
         self.softmax = SoftMax()
 

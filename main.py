@@ -18,6 +18,21 @@ from measurement import measure
 
 import collections
 
+
+# def weights_init(m):
+#     classname = m.__class__.__name__
+#     if 'weight' in dir(m):
+#         # print('ClassName: ', classname, ', Weight: ', type(m.weight))
+#         nn.init.xavier_uniform_(m.weight)
+#     if 'bias' in dir(m):
+#         # print('ClassName: ', classname, ', Bias: ', type(m.bias))
+#         nn.init.zeros_(m.bias)
+
+def weights_init(m):
+    if 'reset_parameters' in dir(m):
+        # print(m.__class__.__name__)
+        m.reset_parameters()
+
 # Models descriptor
 ModelDescriptor = collections.namedtuple(
     'ModelDescriptor',
@@ -46,13 +61,15 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
 
         if isinstance(input, list) or isinstance(input, tuple):
             for i in range(3):
+                noise = torch.randn_like(input[i]) * 0.05
+                input[i] = input[i] + noise
                 input[i] = input[i].to(device)
         else:
+            noise = torch.randn_like(input) * 0.05
+            input = input + noise
             input = input.to(device)
         target = target.to(device)
 
-        # noise = torch.randn_like(input) * 0.05
-        # input = input + noise
         output = model(input) # y + Reg or (y1, y2, y3)
 
         if model.__class__.__name__.find('Triplet') > -1:
@@ -64,6 +81,13 @@ def train(model: nn.Module, train_loader: DataLoader, criterion, optimizer: torc
             output, Reg = output[0], output[1]
             if last_layer is not None:
                 output = last_layer(output)
+            if criterion.__class__.__name__.find('TVLoss') > -1:
+                target_ = target
+                # criterion.Reg.W = GraphTVLoss._get_W(input.view(input.shape[0], -1), target=target_).to(device)
+                if itr<50:
+                    criterion.Reg.alpha = 0
+                else:
+                    criterion.Reg,alpha = 1.
             Loss = criterion((output, Reg), target)
             logit = output
         else:
@@ -113,6 +137,7 @@ def test(model: nn.Module, test_loader: DataLoader, criterion, last_layer=None, 
                     for i in range(len(output)):
                         output[i] = last_layer(output[i])
 
+
             Loss = criterion(output, target)
 
             loss += Loss.item() * input.shape[0]
@@ -132,7 +157,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--batch-size-test', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=300, metavar='N',
+    parser.add_argument('--epochs', type=int, default=200, metavar='N',
                         help='number of epochs to train (default: 100)')
     parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                         help='learning rate (default: 0.01)')
@@ -171,25 +196,25 @@ def main():
     # Model Initialization
     leNet = leNet5()
     cnnGrad = CNNGrad() 
-    graphTV = CNN()
+    graphTV = FCNN()
     cnnFeature = TripletNet(FCNN())
     
     _Info_cnnGrad = ModelDescriptor(
         model = cnnGrad,
         train = {
             'loader': train_loader,
-            'criterion': Loss_with_Reg(nn.NLLLoss(), torch.norm),
+            'criterion': Loss_with_Reg(nn.CrossEntropyLoss(), torch.norm),
             'last_layer': None,
         },
 
         test = {
             'loader': test_loader,
-            'criterion': nn.NLLLoss(),
+            'criterion': nn.CrossEntropyLoss(),
             'last_layer': None,
         }
     )
 
-    graphTVLoss = GraphTVLoss(alpha=.1)
+    graphTVLoss = GraphTVLoss(alpha=.05, n_Neigbr=6, n_sig=5)
     _Info_graphTV = ModelDescriptor(
         model = graphTV,
 
@@ -242,9 +267,9 @@ def main():
 
     Information_List = {
         # 'leNet5': _Info_leNet5,
-        'cnnGrad': _Info_cnnGrad,
+        # 'cnnGrad': _Info_cnnGrad,
         # 'GraphTV': _Info_graphTV,
-        'CNN_Feature': _Info_Feature,
+        # 'CNN_Feature': _Info_Feature,
         'TripletTV': _Info_TripletTV,
     }
 
@@ -268,22 +293,46 @@ def main():
 
 
         # optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        # optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
         model.to(device)
-        for epoch in range(args.epochs):
-            loss_train, acc_train = train(model, train_loader, criterion_train, optimizer, epoch=epoch, last_layer=last_layer_train, device=device, display_inter=1, verbose=verbose)
-            loss_test, acc_test = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
+        tries = 10
+        loss_train_sum, acc_train_sum = 0., 0.
+        loss_test_sum, acc_test_sum = 0., 0.
+        for itr in range(tries):
+            model.apply(weights_init)
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+            for epoch in range(args.epochs):
+                loss_train, acc_train = train(model, train_loader, criterion_train, optimizer, epoch=epoch, last_layer=last_layer_train, device=device, display_inter=1, verbose=verbose)
+                # loss_test, acc_test = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
+                # print(epoch, loss_train, acc_train)
 
             # model._deactivate()
             # loss_test1, acc_test1 = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
             # model._activate()
 
-            print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f} \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
-                args.epochs, name, acc_train*100., loss_train, acc_test*100., loss_test))
+            # print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f} \nTest: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
+            #     args.epochs, name, acc_train*100., loss_train, acc_test*100., loss_test))
+
+            loss_test, acc_test = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
+            loss_train_sum += loss_train
+            loss_test_sum += loss_test
+            acc_train_sum += acc_train
+            acc_test_sum += acc_test
+            print([loss_train, acc_train], [loss_test, acc_test])
+            print({name: [(loss_train_sum/(itr+1), acc_train_sum/(itr+1)), (loss_test_sum/(itr+1), acc_test_sum/(itr+1))]})
+
+            if 'Triplet' in name:
+                model._deactivate()
+                loss_test1, acc_test1 = test(model, test_loader, criterion_test, device=device, last_layer=last_layer_test)
+                model._activate()
+                print(loss_test1, acc_test1)
+            if 'Feature' in name:
+                loss_test1, acc_test1 = test(model, test_loader, criterion_test, device=device)
+                print(loss_test1, acc_test1)
 
 
-        results.append([(loss_train, acc_train), (loss_test, acc_test)])
+        results.append({name: [(loss_train_sum/tries, acc_train_sum/tries), (loss_test_sum/tries, acc_test_sum/tries)]})
 
     print(results)
 if __name__ == '__main__':
