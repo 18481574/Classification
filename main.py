@@ -335,5 +335,7 @@ def main():
         results.append({name: [(loss_train_sum/tries, acc_train_sum/tries), (loss_test_sum/tries, acc_test_sum/tries)]})
 
     print(results)
+
+    
 if __name__ == '__main__':
     main()
