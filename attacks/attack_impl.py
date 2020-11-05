@@ -67,11 +67,11 @@ class PGD(object):
             Batch of samples modified to be adversarial to the model.
         """
         if inputs.min() < 0 or inputs.max() > 1: raise ValueError('Input values should be in the [0, 1] range.')
-    
+        
+
         batch_size = inputs.shape[0]
         multiplier = 1 if targeted else -1
         delta = torch.zeros_like(inputs, requires_grad=True)
-
 
         # Setup optimizers
         optimizer = optim.SGD([delta], lr=self.max_norm/self.steps*2)
@@ -83,7 +83,7 @@ class PGD(object):
             pred_labels = logits.argmax(1)
             ce_loss = F.cross_entropy(logits, labels, reduction='sum')
             loss = multiplier * ce_loss
-
+            
             optimizer.zero_grad()
             loss.backward()
             # renorming gradient
@@ -102,7 +102,7 @@ class PGD(object):
             delta.data.renorm_(p=2, dim=0, maxnorm=self.max_norm)
         return inputs + delta
 
-    def set_device(device: torch.device):
+    def set_device(self, device: torch.device):
         self.device = device
 
 
@@ -189,7 +189,7 @@ class FGSM(object):
     
 
 
-    def set_device(device: torch.device):
+    def set_device(self, device: torch.device):
         self.device = device 
 
 
@@ -285,7 +285,7 @@ class IFGSM(object):
     
 
 
-    def set_device(device: torch.device):
+    def set_device(self, device: torch.device):
         self.device = device 
 
 
