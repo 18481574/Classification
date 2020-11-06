@@ -66,15 +66,19 @@ class SigmoidGrad(nn.Module):
         self.channels = torch.tensor([])
 
     def forward(self, x):
-        self.channels = x
-        e=torch.exp(x)
-        return e/(e+1)
+        # self.channels = x
+        # e=torch.exp(x)
+        # return e/(e+1)
+        self.channels = torch.sigmoid(x)
+        return self.channels
 
     def Gradient(self, x):
-        e = torch.exp(self.channels)
-        grad = (e)/torch.pow(e+1,2)
-        grad = grad * x
-        return grad
+        # e = torch.exp(self.channels)
+        # grad = (e)/torch.pow(e+1,2)
+        # grad = grad * x
+        # return grad
+
+        return self.channels * (1. - self.channels) * x
 
 class ReLUGrad(nn.Module):
     def __init__(self):
@@ -292,18 +296,22 @@ class CNN_MNIST(nn.Module):
         return y
 
 def main():
-    batch_size = 2
+    batch_size = 1
     input_channels = 1
     input_size = 4
     num_class = 2
 
     x = torch.rand(batch_size, input_channels, input_size, input_size)
     x.requires_grad=True
-    model = CNN_MNIST(in_channels=input_channels, num_class=num_class, input_size=input_size)
-    y = model(x)
-    L = torch.sum(y.view(-1))
+    model = CNN_MNIST_Grad(in_channels=input_channels, num_class=num_class, input_size=input_size)
+    
+    model.eval()
+    y = nn.Softmax(dim=1)(model(x))
     G = model.Gradient()
-    y[0,1].backward()
+    # y[0,1].backward()
+    z = torch.sum(y, dim=0)
+    print(z.shape)
+    z[1].backward()
     print(x.grad)
     print(G[1])
 

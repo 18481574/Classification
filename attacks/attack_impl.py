@@ -83,7 +83,7 @@ class PGD(object):
             pred_labels = logits.argmax(1)
             ce_loss = F.cross_entropy(logits, labels, reduction='sum')
             loss = multiplier * ce_loss
-            
+
             optimizer.zero_grad()
             loss.backward()
             # renorming gradient
@@ -126,6 +126,7 @@ class FGSM(object):
         super(FGSM, self).__init__()
 
         self.steps = steps
+        self.step_size = step_size
         self.random_start = random_start
         self.device = device
 
@@ -161,7 +162,7 @@ class FGSM(object):
         delta = torch.zeros_like(inputs, requires_grad=True)
 
         # Setup optimizers
-        optimizer = optim.SGD([delta], lr=self.eps_iter)
+        optimizer = optim.SGD([delta], lr=self.step_size)
 
         for i in range(self.steps):
             adv = inputs + delta
@@ -173,12 +174,13 @@ class FGSM(object):
             optimizer.zero_grad()
             loss.backward()
             # renorming gradient
-            grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
-            delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
+            # grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
+            # delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
+            delta.grad.sign_()
             
             # avoid nan or inf if gradient is 0
-            if (grad_norms == 0).any():
-                delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
+            # if (grad_norms == 0).any():
+                # delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
 
             optimizer.step()
 

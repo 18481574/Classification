@@ -34,6 +34,7 @@ ModelDescriptor = collections.namedtuple(
         'model', 
         # 'train',
         'test',
+        'filename',
         'save_dir',
     ])
 
@@ -88,7 +89,7 @@ def main():
     batch_size = 128
 
     test_dataset = DataSet(dataset=dataset_name, split=test_split)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     cnn = CNN()
     cnnGrad = CNNGrad()
@@ -101,7 +102,7 @@ def main():
             'loader': test_loader,
             'criterion': nn.CrossEntropyLoss(),
         },
-
+        filename = 'CNN_base',
         save_dir = './results/cnn',
     )
 
@@ -111,7 +112,7 @@ def main():
             'loader': test_loader,
             'criterion': nn.CrossEntropyLoss()
         },
-
+        filename = 'CNN_Grad',
         save_dir = './results/cnn_grad',
     )
 
@@ -121,7 +122,7 @@ def main():
             'loader': test_loader,
             'criterion': nn.CrossEntropyLoss(),
         },
-
+        filename = 'CNN_Triplet',
         save_dir = './results/cnn_triplet',
     )
 
@@ -131,7 +132,7 @@ def main():
             'loader': test_loader,
             'criterion': nn.CrossEntropyLoss(),
         },
-
+        filename = 'CNN_Triplet',
         save_dir = './results/cnn_triplet',
     )
 
@@ -155,8 +156,8 @@ def main():
         detail = {
             'steps': 10,
             'random_start': False,
-            'max_norm': 0.1,
-            'step_size':0.05,
+            'max_norm': 0.01,
+            'step_size':0.001,
         }
     )
 
@@ -171,8 +172,8 @@ def main():
     )
 
     _Info_attackers={
-        'PGD': _Info_PGD,
         'FGSM': _Info_FGSM,
+        'PGD': _Info_PGD,
     }
 
 
@@ -188,12 +189,15 @@ def main():
             test_ = _INFO.test
             loader = test_['loader']
             criterion = test_['criterion']
+            # filename = _INFO.filename
 
             save_dir = _INFO.save_dir
 
+            model.to(device)
+
             acc_pred_sum, acc_attack_sum, loss_sum = 0., 0., 0.
             for itr in range(tries):
-                filename = name + '_' + str(itr) + '.pt'
+                filename = _INFO.filename + '_' + str(itr) + '.pt'
                 save_path = os.path.join(save_dir, filename)
                 model_ = torch.load(save_path, map_location=device)
                 model.load_state_dict(state_dict = model_.state_dict())
@@ -203,8 +207,10 @@ def main():
                 acc_attack_sum += acc_attack
                 loss_sum += loss_test
 
-            print('{}({}): \tAcc_pred = {.2f}%, \tAcc_attack = {.2f}%, loss'.format(name, attacker.name,
-                acc_pred_sum/tries*100, acc_attack_sum/tries*100, loss_sum/tries*100))
+                print('itr = {}, \tAcc_pred = {:.2f}%, \tAcc_attack = {:.2f}%, loss = {:.2f}'.format(itr, acc_pred*100, acc_attack*100, loss_test))
+
+            print('{}({}): \tAcc_pred = {:.2f}%, \tAcc_attack = {:.2f}%, loss = {:.2f}'.format(name, attacker.name,
+                acc_pred_sum/tries*100, acc_attack_sum/tries*100, loss_sum/tries))
 
 if __name__ == '__main__':
     main()

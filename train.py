@@ -91,7 +91,7 @@ def main():
     train_split = 'train_small'
 
     batch_size = 32
-    epochs = 300
+    epochs = 1234
 
     train_dataset = DataSet(dataset=dataset_name, split=train_split)
 
@@ -112,7 +112,7 @@ def main():
             'criterion': nn.CrossEntropyLoss(),
         },
 
-        save_dir = './results/cnn',
+        save_dir = './results/cnn(sigmoid)',
     )
 
     _Info_CNNGrad = ModelDescriptor(
@@ -122,7 +122,7 @@ def main():
             'criterion': Loss_with_Reg(nn.CrossEntropyLoss(), torch.norm),
         },
 
-        save_dir = './results/cnn_grad',
+        save_dir = './results/cnn_grad(sigmoid)',
     )
 
     _Info_CNNTriplet = ModelDescriptor(
@@ -132,14 +132,14 @@ def main():
             'criterion': CE_with_RegLoss(),
         },
 
-        save_dir = './results/cnn_triplet',
+        save_dir = './results/cnn_triplet(sigmoid)',
 
     )
 
     Information_List = {
-        'CNN_base': _Info_CNN,
+        # 'CNN_base': _Info_CNN,
         'CNN_Grad': _Info_CNNGrad,
-        'CNN_Triplet': _Info_CNNTriplet,
+        # 'CNN_Triplet': _Info_CNNTriplet,
     }
 
     for name in Information_List:
@@ -172,7 +172,7 @@ def main():
             filename = name + '_' + str(itr) + '.pt'
             save_path = os.path.join(save_dir, filename)
 
-            torch.save(model, save_path)
+            # torch.save(model, save_path)
 
 
         print(name, loss_train_sum/tries, acc_train_sum/tries)
