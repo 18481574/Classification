@@ -112,7 +112,7 @@ def main():
             'criterion': nn.CrossEntropyLoss(),
         },
 
-        save_dir = './results/cnn(sigmoid)',
+        save_dir = './results/cnn',
     )
 
     _Info_CNNGrad = ModelDescriptor(
@@ -122,7 +122,7 @@ def main():
             'criterion': Loss_with_Reg(nn.CrossEntropyLoss(), torch.norm),
         },
 
-        save_dir = './results/cnn_grad(sigmoid)',
+        save_dir = './results/cnn_grad',
     )
 
     _Info_CNNTriplet = ModelDescriptor(
@@ -132,14 +132,14 @@ def main():
             'criterion': CE_with_RegLoss(),
         },
 
-        save_dir = './results/cnn_triplet(sigmoid)',
+        save_dir = './results/cnn_triplet',
 
     )
 
     Information_List = {
-        # 'CNN_base': _Info_CNN,
+        'CNN_base': _Info_CNN,
         'CNN_Grad': _Info_CNNGrad,
-        # 'CNN_Triplet': _Info_CNNTriplet,
+        'CNN_Triplet': _Info_CNNTriplet,
     }
 
     for name in Information_List:
@@ -166,13 +166,13 @@ def main():
                 acc_train_sum += acc_train
 
                 if epoch % 10 == 0:
-                    print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.2f}%, \tLoss = {:.2f}'.format(epoch,
+                    print('Epoch [{}/{}] ({}): \nTrain: \tAcc = {:.6f}%, \tLoss = {:.6f}'.format(epoch,
                         epochs, name, acc_train*100., loss_train))
 
             filename = name + '_' + str(itr) + '.pt'
             save_path = os.path.join(save_dir, filename)
 
-            # torch.save(model, save_path)
+            torch.save(model.state_dict(), save_path)
 
 
         print(name, loss_train_sum/tries, acc_train_sum/tries)

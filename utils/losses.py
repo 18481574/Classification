@@ -17,7 +17,7 @@ class Loss_with_Reg(nn.Module):
 
         if isinstance(y, list) or isinstance(y, tuple):
             for v in y:
-                Reg = self.criterion_Reg(v)
+                Reg = self.criterion_Reg(v, p=2, dim=1).sum() # torch.norm
                 Loss += Reg
         else:
             Reg = self.criterion_Reg(y)

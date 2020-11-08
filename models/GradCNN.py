@@ -246,6 +246,7 @@ class CNN_MNIST_Grad(nn.Module):
             grad = self.pool1.Gradient(grad)
             grad = self.conv1.Gradient(grad)
 
+            grad = grad.view(grad.shape[0], -1)
             grads.append(grad * self.alpha)
 
         return grads
