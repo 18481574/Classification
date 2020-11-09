@@ -82,7 +82,8 @@ class PGD(object):
             logits = model(adv)
             pred_labels = logits.argmax(1)
             ce_loss = F.cross_entropy(logits, labels, reduction='sum')
-            loss = multiplier * ce_loss
+            w = _get_weight(pred_labels, labels, targeted)
+            loss = multiplier * w * ce_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -101,6 +102,15 @@ class PGD(object):
 
             delta.data.renorm_(p=2, dim=0, maxnorm=self.max_norm)
         return inputs + delta
+
+    def _get_weight(pred, label, targeted):
+        # targeted: pred==label := 0
+
+        if targetd:
+            w = (~pred.eq(label)).type(torch.float32)
+        else:
+            w = pred.eq(label).type(torch.float32)
+        return w.to(pred.device)
 
     def set_device(self, device: torch.device):
         self.device = device
@@ -169,7 +179,8 @@ class FGSM(object):
             logits = model(adv)
             pred_labels = logits.argmax(1)
             ce_loss = F.cross_entropy(logits, labels, reduction='sum')
-            loss = multiplier * ce_loss
+            w = _get_weight(pred_labels, labels, targeted)
+            loss = multiplier * w * ce_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -189,7 +200,14 @@ class FGSM(object):
 
         return inputs + delta
     
+    def _get_weight(pred, label, targeted):
+        # targeted: pred==label := 0
 
+        if targetd:
+            w = (~pred.eq(label)).type(torch.float32)
+        else:
+            w = pred.eq(label).type(torch.float32)
+        return w.to(pred.device)
 
     def set_device(self, device: torch.device):
         self.device = device 

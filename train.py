@@ -91,7 +91,7 @@ def main():
     train_split = 'train_small'
 
     batch_size = 32
-    epochs = 1234
+    epochs = 1000
 
     train_dataset = DataSet(dataset=dataset_name, split=train_split)
 
@@ -112,7 +112,7 @@ def main():
             'criterion': nn.CrossEntropyLoss(),
         },
 
-        save_dir = './results/cnn',
+        save_dir = './results/cnn(sigmoid)',
     )
 
     _Info_CNNGrad = ModelDescriptor(
@@ -122,7 +122,7 @@ def main():
             'criterion': Loss_with_Reg(nn.CrossEntropyLoss(), torch.norm),
         },
 
-        save_dir = './results/cnn_grad',
+        save_dir = './results/cnn_grad(sigmoid)',
     )
 
     _Info_CNNTriplet = ModelDescriptor(
