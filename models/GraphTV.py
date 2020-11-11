@@ -33,6 +33,7 @@ class GraphTVLoss(nn.Module):
             W_ = self.W
 
         # W = self._get_W(x, self.n_Neigbr, self.n_sig)
+        # print('W_: ', W_.device, type(W_))
         Wx = W_.matmul(x)
         norm_ = Wx.norm(dim=1).sum() # TV
         # norm_ = Wx.abs().sum()

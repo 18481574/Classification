@@ -90,7 +90,7 @@ def main():
     dataset_name = 'mnist'
     train_split = 'train_small'
 
-    batch_size = 32
+    batch_size = 128
     epochs = 1000
 
     train_dataset = DataSet(dataset=dataset_name, split=train_split)
@@ -137,7 +137,7 @@ def main():
     )
 
     Information_List = {
-        'CNN_base': _Info_CNN,
+        # 'CNN_base': _Info_CNN,
         'CNN_Grad': _Info_CNNGrad,
         'CNN_Triplet': _Info_CNNTriplet,
     }
@@ -172,7 +172,7 @@ def main():
             filename = name + '_' + str(itr) + '.pt'
             save_path = os.path.join(save_dir, filename)
 
-            torch.save(model.state_dict(), save_path)
+            # torch.save(model.state_dict(), save_path)
 
 
         print(name, loss_train_sum/tries, acc_train_sum/tries)

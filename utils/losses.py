@@ -18,7 +18,7 @@ class Loss_with_Reg(nn.Module):
         if isinstance(y, list) or isinstance(y, tuple):
             for v in y:
                 Reg = self.criterion_Reg(v, p=2, dim=1).sum() # torch.norm
-                Loss += Reg
+                Loss = Loss + Reg
         else:
             Reg = self.criterion_Reg(y)
             Loss += Reg
@@ -32,7 +32,8 @@ class CrossEntropy_with_GraphTVLoss(nn.Module):
 
     def forward(self, data, target):
         if isinstance(data, tuple) or isinstance(data, list):
-            x, feature = data[0], nn.functional.normalize(data[1], dim=1)
+            # x, feature = data[0], nn.functional.normalize(data[1], dim=1)
+            x, feature = data[0], data[1]
         else:
             x = data
             feature = data
@@ -40,7 +41,6 @@ class CrossEntropy_with_GraphTVLoss(nn.Module):
         Loss = nn.CrossEntropyLoss()(x, target)
         # Loss = nn.NLLLoss()(torch.log(x), target)
         Loss_Reg = self.Reg(feature)
-
 
         return Loss + Loss_Reg
 
