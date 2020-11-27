@@ -12,7 +12,7 @@ import random
 
 import collections
 
-__all__ = ['DataSet', 'Triplet', ]
+__all__ = ['DataSet', 'Triplet', 'PairedSample']
 
 def print_path():
     path = os.getcwd()
@@ -35,7 +35,7 @@ _MNIST_INFORMATION = DatasetDescriptor(
     splits_to_sizes = { 'train': 60000,
                         'train_aug': 100000, # randomly choose?
                         'test': 10000,
-                        'train_small': 600,},
+                        'train_small': 100,},
     num_classes = 10,
     unknown_label = None,
 
@@ -250,6 +250,34 @@ class Triplet(Dataset):
         negtive = self.dataset.data[idx_neg]
 
         return (anchor, positive, negtive), target
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+class PairedSample(DataSet):
+    def __init__(self, dataset, num_sample=1):
+        super(PairedSample, self).__init__()
+        self.dataset = dataset
+
+        self.num_sample = num_sample 
+        self.num_classes = dataset.num_classes
+        self.all_classes = set(range(self.num_classes))
+        self.idxes = [ set((dataset.target.view(-1)==idx).nonzero().view(-1).numpy()) for idx in range(self.num_classes)]
+
+    def __getitem__(self, idx):
+        anchor = self.dataset.data[idx]
+        target = self.dataset.target[idx]
+        positives = []
+
+        label_pos = int(target)
+        idxes_pos = random.choices(tuple(self.idxes[label_pos]- {idx}), k=self.num_sample)
+
+        for i in idxes_pos:
+            positives.append(self.dataset.data[i])
+
+
+        return (anchor, positives), target
 
     def __len__(self):
         return len(self.dataset)

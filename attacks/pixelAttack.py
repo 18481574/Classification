@@ -12,7 +12,7 @@ import torch.nn as nn
 # Helper functions
 from .differential_evolution import *
 
-__all__ = ['PixelAttacker']
+__all__ = ['OnePixelAttack']
 
 # Not complete
 
@@ -41,13 +41,13 @@ def perturb_image(xs:np.array , img: torch.Tensor)-> torch.Tensor:
     # Copy the image n == len(xs) times so that we can 
     # create n new perturbed images
 
-    # guarantee that img size is: dim_x x dim_y x channels
-    channels_ = img.shape[2]
+    # guarantee that img size is: dim_x x dim_y x channels -> CWH
+    channels_ = img.shape[0]
     N_pixel = 2 + channels_
     tile = [len(xs)] + [1] * 3
     # print(img.shape, tile)
     # imgs = np.tile(img, tile)
-    imgs = img.repeat(img, tile)
+    imgs = img.repeat(tile)
 
     # print(imgs.shape, img.shape, xs.shape)
     # Make sure to floor the members of xs as int types
@@ -60,12 +60,14 @@ def perturb_image(xs:np.array , img: torch.Tensor)-> torch.Tensor:
             # At each pixel's x,y position, assign its rgb value
             # print('Pixel: ', pixel)
             x_pos, y_pos, *color_ = pixel
-            img[x_pos, y_pos] = torch.Tensor(color_ / 255.) 
+            # img[x_pos, y_pos] = torch.Tensor(color_ / 255.) 
+            for c in range(channels_):
+                img[c, x_pos, y_pos] = color_[c]/255.
 
     return imgs
 
 
-class PixelAttacker(object):
+class OnePixelAttack(object):
     """
     One Pixel attack
     Parameters
@@ -80,24 +82,26 @@ class PixelAttacker(object):
         Device on which to perform the attack.
     """
     def __init__(self,
-                 steps: int = 10,
+                 steps: int = 100,
                  random_start: bool = True,
-                 popsize: int = 400,
+                 popsize: int = 200,
+                 pixel_count: int = 1,
                  device: torch.device = torch.device('cpu')) -> None:
-        super(PixelAttacker, self).__init__()
+        super(OnePixelAttack, self).__init__()
 
         self.steps = steps
         self.random_start = random_start
         self.popsize = popsize
-
+        self.pixel_count = pixel_count
         self.device = device
-
 
     def predict_classes(self, xs, img, label_class, targeted, model) -> torch.Tensor:
         # Perturb the image with the given pixel(s) x and get the prediction of the model
-        imgs_perturbed = perturb_image(xs, img)
-            
-        predictions = model(imgs_perturbed)[:, label_class]
+        imgs_perturbed = perturb_image(xs, img).to(self.device)
+        
+        # predictions = model(imgs_perturbed)[:, label_class]
+        logit = model(imgs_perturbed)
+        predictions = nn.Softmax(dim=1)(logit)[:, label_class]
 
         # avoid incompatible in codes
         predictions = predictions.detach().cpu().numpy()
@@ -106,9 +110,10 @@ class PixelAttacker(object):
 
     def attack_success(self, x, img, target_class, model, targeted_attack=False, verbose=False):
         # Perturb the image with the given pixel(s) and get the prediction of the model
-        attack_image = perturb_image(x, img)
+        attack_image = perturb_image(x, img).to(self.device)
 
-        confidence = model.predict(attack_image)[0]
+        # confidence = model.predict(attack_image)[0]
+        confidence = model(attack_image)[0].detach().cpu().numpy()
         predicted_class = np.argmax(confidence).item()
 
         # If the prediction is what we want (misclassification or 
@@ -131,10 +136,11 @@ class PixelAttacker(object):
         perturb = torch.zeros_like(inputs)
         
         for k in range(Batch_size):
+            # print('{}/{}...'.format(k+1, Batch_size))
             img = inputs[k]
-            label_class = labels[k][0].item() 
+            label_class = labels[k].cpu().item() 
 
-            perturb[k] = self._attcak_single(model, img, label_class, targeted)
+            perturb[k] = self._attack_single(model, img, label_class, targeted)
 
         return perturb
 
@@ -158,14 +164,13 @@ class PixelAttacker(object):
 
         # Define bounds for a flat vector of x,y,r,g,b values
         # For more pixels, repeat this layout
-        dim_x, dim_y = inputs.shape[1:3]
-        channels_ = inputs.shape[3]  # inputs: batch x dimx x dimy x channels
+        dim_x, dim_y = img.shape[1:3]
+        channels_ = img.shape[0]  # inputs: batch x dimx x dimy x channels -> CHW
         pixel_fill = [(0, 256)] * channels_
-        bounds = ([(0, dim_x), (0, dim_y)] + pixel_fill) * (pixel_count * inputs.shape[0])
-        # bounds = [(0, dim_x), (0, dim_y), (0, 256), (0, 256), (0, 256)] * pixel_count * inputs.shape[0]
+        bounds = ([(0, dim_x), (0, dim_y)] + pixel_fill) * self.pixel_count 
 
         # Population multiplier, in terms of the size of the perturbation vector x
-        popmul = max(1, popsize // len(bounds))
+        popmul = max(1, self.popsize // len(bounds))
 
         # Format the predict/callback functions for the differential evolution algorithm
         def predict_fn(xs):
@@ -190,7 +195,7 @@ class PixelAttacker(object):
 
         img_perturbed = perturb_image(attack_result.x, img)[0]
 
-        return img_perturbed - img
+        return img_perturbed
         # return helper.perturb_image(attack_result.x, inputs)
         
 

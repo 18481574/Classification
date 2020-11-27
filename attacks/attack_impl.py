@@ -9,7 +9,7 @@ import torch.optim as optim
 from typing import Optional
 
 # attacker from other files
-from .pixelAttack import PixelAttacker
+from .pixelAttack import OnePixelAttack
 
 __all__ = ['PGD', 'FGSM', 'IFGSM', 'OnePixelAttack', ]
 
@@ -28,19 +28,24 @@ class PGD(object):
     device : torch.device, optional
         Device on which to perform the attack.
     """
-
+    types = ['L2', 'Infty']
     def __init__(self,
                  steps: int = 10,
                  step_size: float = 0.05,
                  random_start: bool = True,
                  max_norm: Optional[float] = None,
+                 norm_type = 'L2',
                  device: torch.device = torch.device('cpu')) -> None:
         super(PGD, self).__init__()
 
         self.steps = steps
+        self.step_size = step_size
         self.random_start = random_start
         self.max_norm = max_norm
         self.device = device
+        if norm_type not in PGD.types:
+            raise NotImplementedError('norm_type only could be L2 or Infty...')
+        self.norm_type = norm_type
 
     def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
             targeted: bool = False) -> torch.Tensor:
@@ -71,46 +76,55 @@ class PGD(object):
 
         batch_size = inputs.shape[0]
         multiplier = 1 if targeted else -1
-        delta = torch.zeros_like(inputs, requires_grad=True)
+
+        if self.random_start:
+            delta = torch.randn_like(inputs)
+            self._clip(delta)
+        else:
+            delta = torch.zeros_like(inputs)
+        delta.requires_grad = True
 
         # Setup optimizers
-        optimizer = optim.SGD([delta], lr=self.max_norm/self.steps*2)
-        # optimizer = optim.SGD([delta], lr=self.eps_iter)
+        optimizer = optim.SGD([delta], lr=self.step_size)
 
         for i in range(self.steps):
             adv = inputs + delta
             logits = model(adv)
             pred_labels = logits.argmax(1)
             ce_loss = F.cross_entropy(logits, labels, reduction='sum')
-            w = _get_weight(pred_labels, labels, targeted)
-            loss = multiplier * w * ce_loss
-
+            loss = multiplier * ce_loss
+            
             optimizer.zero_grad()
             loss.backward()
             # renorming gradient
-            grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
-            delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
-            
-            # avoid nan or inf if gradient is 0
-            if (grad_norms == 0).any():
-                delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
+            self._grad_normalize(delta)
 
             optimizer.step()
 
             delta.data.add_(inputs)
             delta.data.clamp_(0, 1).sub_(inputs)
 
-            delta.data.renorm_(p=2, dim=0, maxnorm=self.max_norm)
+            self._clip(delta)
+        
         return inputs + delta
 
-    def _get_weight(pred, label, targeted):
-        # targeted: pred==label := 0
+    def _clip(self, x, max_norm=None):
+        if max_norm is None:
+            max_norm = self.max_norm
 
-        if targetd:
-            w = (~pred.eq(label)).type(torch.float32)
+        if self.norm_type == 'L2':
+            x.data.renorm_(p=2, dim=0, maxnorm=max_norm)
+        else: 
+            x.data.clamp_(-max_norm, max_norm)
+
+    def _grad_normalize(self, x):
+        if self.norm_type == 'L2':
+            grad_norms = x.grad.view(x.shape[0], -1).norm(p=2, dim=1)
+            x.grad.div_(grad_norms.view(-1, 1, 1, 1) + 1e-12)
         else:
-            w = pred.eq(label).type(torch.float32)
-        return w.to(pred.device)
+            x.grad.sign_()
+
+
 
     def set_device(self, device: torch.device):
         self.device = device
@@ -136,9 +150,9 @@ class FGSM(object):
         super(FGSM, self).__init__()
 
         self.steps = steps
-        self.step_size = step_size
         self.random_start = random_start
         self.device = device
+        self.step_size = step_size
 
 
     def attack(self, model: nn.Module, inputs: torch.Tensor, labels: torch.Tensor,
@@ -179,19 +193,17 @@ class FGSM(object):
             logits = model(adv)
             pred_labels = logits.argmax(1)
             ce_loss = F.cross_entropy(logits, labels, reduction='sum')
-            w = _get_weight(pred_labels, labels, targeted)
-            loss = multiplier * w * ce_loss
+            loss = multiplier * ce_loss
 
             optimizer.zero_grad()
             loss.backward()
             # renorming gradient
-            # grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
-            # delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
-            delta.grad.sign_()
+            grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
+            delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
             
             # avoid nan or inf if gradient is 0
-            # if (grad_norms == 0).any():
-                # delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
+            if (grad_norms == 0).any():
+                delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
 
             optimizer.step()
 
@@ -200,14 +212,7 @@ class FGSM(object):
 
         return inputs + delta
     
-    def _get_weight(pred, label, targeted):
-        # targeted: pred==label := 0
 
-        if targetd:
-            w = (~pred.eq(label)).type(torch.float32)
-        else:
-            w = pred.eq(label).type(torch.float32)
-        return w.to(pred.device)
 
     def set_device(self, device: torch.device):
         self.device = device 
@@ -309,7 +314,4 @@ class IFGSM(object):
         self.device = device 
 
 
-def OnePixelAttack(**_info): 
-    return PixelAttacker(_info)
-    return []
-
+    

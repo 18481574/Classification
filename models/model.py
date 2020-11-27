@@ -3,55 +3,107 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .GradCNN import CNN_MNIST, CNN_MNIST_Grad
+from .GradCNN import * 
 from .GraphTV import *
 
 CNNGrad = CNN_MNIST_Grad
 CNN = CNN_MNIST
 
-_Models = ['leNet5', 'CNN', 'CNNGrad', 'FCNN', 'TripletNet', 'TripletNetTV', 'ClassifierTV',]
-_Loss_layers = ['GraphTVLoss',]
+_Models = ['LeNet5', 'CNN', 'CNNGrad', 'FCNN', 'TripletNet', 'TripletNetTV', 'ClassifierTV', 'LeNet5_TVGraph',]
+_Loss_layers = ['GraphTVLoss', 'TVGradLoss']
 _Activation_layers = ['SoftMaxTV', 'ReLUTV',]
 _Misc = []
 
 __all__ = _Models + _Loss_layers + _Activation_layers + _Misc
 
 
-class leNet5(nn.Module):
+# class LeNet5(nn.Module): LeCun's
+#     def __init__(self):
+#         super(LeNet5, self).__init__()
+#         self.conv1 = nn.Conv2d(1, 6, 5, 1, padding=2)
+#         self.pool1 = nn.Conv2d(6, 6, 2, 2)
+#         self.conv2 = nn.Conv2d(6, 16, 5, 1)
+#         self.pool2 = nn.Conv2d(16, 16, 2, 2)
+#         self.conv3 = nn.Conv2d(16, 120, 5, 1)
+#         self.fc1 = nn.Linear(120, 84)
+#         self.fc2 = nn.Linear(84, 10)
+
+#     def forward(self, x):
+#         # 1x28x28
+#         x = F.relu(self.conv1(x))
+#         # 6x28x28
+        
+#         # x = F.max_pool2d(x, 2, 2)
+#         x = F.relu(self.pool1(x))
+#         # 6x14x14
+        
+#         x = F.relu(self.conv2(x))
+#         # 16x10x10
+
+#         # x = F.max_pool2d(x, 2, 2)
+#         x = F.relu(self.pool2(x))
+#         # 16x5x5
+
+#         x = F.relu(self.conv3(x))
+#         # 120x1x1
+
+#         x = x.view(-1, 120)
+#         x = F.relu(self.fc1(x)) # 120 -> 84
+#         logit = self.fc2(x) # 84 -> 10
+
+#         return logit
+
+class LeNet5(nn.Module): # ALP's paper
     def __init__(self):
-        super(leNet5, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 5, 1, padding=2)
-        self.pool1 = nn.Conv2d(6, 6, 2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5, 1)
-        self.pool2 = nn.Conv2d(16, 16, 2, 2)
-        self.conv3 = nn.Conv2d(16, 120, 5, 1)
-        self.fc1 = nn.Linear(120, 84)
-        self.fc2 = nn.Linear(84, 10)
+        super(LeNet5, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 5, 1, padding=2)
+        self.pool1 = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(32, 64, 5, 1, padding=2)
+        self.pool2 = nn.MaxPool2d(2, 2)
+        
+        self.fc1 = nn.Linear(64*49, 1024)
+        self.fc2 = nn.Linear(1024, 10)
+
+        self.activation = nn.ReLU()
 
     def forward(self, x):
-        # 1x28x28
-        x = F.relu(self.conv1(x))
-        # 6x28x28
+        # 1x28x28 -> 32x14x14
+        x = self.activation(self.pool1(self.conv1(x)))
         
-        # x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.pool1(x))
-        # 6x14x14
+        # 32x14x14 -> 64x7x7
+        x = self.activation(self.pool2(self.conv2(x)))
         
-        x = F.relu(self.conv2(x))
-        # 16x10x10
-
-        # x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.pool2(x))
-        # 16x5x5
-
-        x = F.relu(self.conv3(x))
-        # 120x1x1
-
-        x = x.view(-1, 120)
-        x = F.relu(self.fc1(x)) # 120 -> 84
-        logit = self.fc2(x) # 84 -> 10
+        # Flatten
+        x = x.view(-1, 64*49)
+        
+        # FC1: 64*49 -> 1024
+        x = self.activation(self.fc1(x))
+        
+        # FC2: 1024 -> 10
+        logit = self.fc2(x)
 
         return logit
+
+class LeNet5_TVGraph(nn.Module):
+    def __init__(self, model):
+        super(LeNet5_TVGraph, self).__init__()
+        self.model = model
+
+    def forward(self, data):
+        if self.training:
+            anchor, positives = data[0], data[1]
+            logit_src = self.model(anchor)
+            logit_pos = []
+            for positive in positives:
+                logit_pos.append(self.model(positive))
+
+            return logit_src, logit_pos
+        else:
+            if isinstance(data, list) or isinstance(data, tuple):
+                data = data[0]
+            logit = self.model(data)
+            return logit
+
 
 
 class FCNN(nn.Module):

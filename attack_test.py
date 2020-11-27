@@ -74,10 +74,10 @@ def test(model, loader, attacker, criterion, device):
 
             logit_attack = model(input_attack)
             pred_attack = torch.argmax(logit_attack, dim=1)
-            attack_success += pred_attack.eq(target).sum().item()
+            attack_success += (~pred_attack.eq(target)).sum().item()
 
     # pred_succes should > 0
-    return pred_success / N, (attack_success - (N - pred_success)) / pred_success, loss / N
+    return pred_success / N, attack_success  / N, loss / N
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -137,10 +137,10 @@ def main():
     )
 
     Information_List = {
-        'CNN_base': _Info_CNN,
+        # 'CNN_base': _Info_CNN,
         'CNN_Grad': _Info_CNNGrad,
-        'CNN_Triplet_deactive': _Info_CNNTriplet_deactive,
-        'CNN_Triplet_active': _Info_CNNTriplet_active,
+        # 'CNN_Triplet_deactive': _Info_CNNTriplet_deactive,
+        # 'CNN_Triplet_active': _Info_CNNTriplet_active,
     }
 
 
@@ -154,10 +154,11 @@ def main():
         name = 'PGD',
         device = device,
         detail = {
-            'steps': 10,
-            'random_start': False,
-            'max_norm': 0.01,
-            'step_size':0.001,
+            'steps': 40,
+            'random_start': True,
+            'max_norm': 0.3,
+            'step_size':0.01,
+            'norm_type': 'Infty',
         }
     )
 
@@ -167,7 +168,7 @@ def main():
         detail = {
             'step': 1,
             'random_start': False,
-            'step_size': 0.25,
+            'step_size': 0.1,
         }
     )
 
@@ -200,7 +201,7 @@ def main():
                 filename = _INFO.filename + '_' + str(itr) + '.pt'
                 save_path = os.path.join(save_dir, filename)
                 model_ = torch.load(save_path, map_location=device)
-                model.load_state_dict(state_dict = model_.state_dict())
+                model.load_state_dict(state_dict = model_)
                 acc_pred, acc_attack, loss_test = test(model, loader, attacker, criterion, device)
 
                 acc_pred_sum += acc_pred
